@@ -7,21 +7,19 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type CommonConfiguration struct {
-	Logger struct {
-		Level           string `yaml:"level"`
-		DevelopmentMode bool   `yaml:"developmentMode"`
-	} `yaml:"logger"`
+type LoggerConfiguration struct {
+	Level           string `yaml:"level"`
+	DevelopmentMode bool   `yaml:"developmentMode"`
 }
 
-func (c CommonConfiguration) BuildLogger() (*zap.Logger, error) {
+func (c LoggerConfiguration) BuildLogger() (*zap.Logger, error) {
 	config := zap.NewProductionConfig()
-	if c.Logger.DevelopmentMode {
+	if c.DevelopmentMode {
 		config = zap.NewDevelopmentConfig()
 	}
 
 	level := "info"
-	if l := c.Logger.Level; len(l) != 0 {
+	if l := c.Level; len(l) != 0 {
 		level = l
 	}
 
