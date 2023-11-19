@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -9,11 +10,15 @@ import (
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 
+	gatewayclient "github.com/faustuzas/tcha/src/gateway/client"
+	pkgconfig "github.com/faustuzas/tcha/src/pkg/config"
 	pkgserver "github.com/faustuzas/tcha/src/pkg/server"
 )
 
 type Configuration struct {
-	ServerListenAddress *pkgserver.ListenAddr
+	pkgconfig.CommonConfiguration `yaml:",inline"`
+
+	ServerListenAddress *pkgserver.ListenAddr `yaml:"listenAddress"`
 }
 
 type Params struct {
@@ -27,7 +32,7 @@ type Params struct {
 // Start starts gateway server and blocks until close request is received.
 // Returns error in case initialisation failed.
 func Start(p Params) error {
-	logger := p.Logger.With(zap.String("component", "gateway"))
+	logger := p.Logger
 
 	routes, err := configureRoutes(p)
 	if err != nil {
@@ -71,13 +76,29 @@ func Start(p Params) error {
 	return nil
 }
 
-func configureRoutes(p Params) (http.Handler, error) {
+func configureRoutes(_ Params) (http.Handler, error) {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		_, _ = w.Write([]byte("ok")) // add some proper error handling
 	}).Methods(http.MethodGet)
+
+	r.HandleFunc("/authenticate", func(w http.ResponseWriter, r *http.Request) {
+		var req gatewayclient.AuthenticationRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			fmt.Printf(":( %v\n", err)
+			return
+		}
+
+		resp := gatewayclient.AuthenticationResponse{
+			Token: fmt.Sprintf("token-%v-%v", req.Username, req.Password),
+		}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			fmt.Printf(":(( %v\n", err)
+			return
+		}
+	}).Methods(http.MethodPost)
 
 	return r, nil
 }

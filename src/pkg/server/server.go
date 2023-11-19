@@ -32,11 +32,15 @@ func (a *ListenAddr) Listener() (net.Listener, error) {
 	return listener, nil
 }
 
-func ListenAddrFromListener(listener net.Listener) *ListenAddr {
-	return &ListenAddr{
-		address:  listener.Addr().String(),
-		listener: listener,
+func (a *ListenAddr) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var address string
+	if err := unmarshal(&address); err != nil {
+		return err
 	}
+
+	a.address = address
+
+	return nil
 }
 
 func ListenAddrFromAddress(addr string) *ListenAddr {
