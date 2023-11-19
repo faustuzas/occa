@@ -22,7 +22,8 @@ func RequestLogger(logger *zap.Logger) func(src http.Handler) http.Handler {
 				zap.String("method", r.Method),
 				zap.String("path", r.URL.Path),
 				zap.Stringer("duration", time.Since(startTime)),
-				zap.Int("status_code", statusCode))
+				zap.Int("status_code", statusCode),
+				zap.String("remote_address", r.RemoteAddr))
 		})
 	}
 }

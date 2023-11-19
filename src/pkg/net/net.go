@@ -1,4 +1,4 @@
-package server
+package net
 
 import (
 	"fmt"
@@ -11,6 +11,10 @@ type ListenAddr struct {
 }
 
 func (a *ListenAddr) String() string {
+	if a == nil {
+		return fmt.Sprintf("<nil>")
+	}
+
 	if a.listener == nil {
 		return fmt.Sprintf("provided but not bound: %v", a.address)
 	}

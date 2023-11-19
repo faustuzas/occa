@@ -12,7 +12,7 @@ type LoggerConfiguration struct {
 	DevelopmentMode bool   `yaml:"developmentMode"`
 }
 
-func (c LoggerConfiguration) BuildLogger() (*zap.Logger, error) {
+func (c LoggerConfiguration) Build() (*zap.Logger, error) {
 	config := zap.NewProductionConfig()
 	if c.DevelopmentMode {
 		config = zap.NewDevelopmentConfig()

@@ -9,7 +9,7 @@ import (
 
 	"github.com/faustuzas/occa/src/gateway"
 	"github.com/faustuzas/occa/src/integration/helpers"
-	pkgserver "github.com/faustuzas/occa/src/pkg/server"
+	pkgnet "github.com/faustuzas/occa/src/pkg/net"
 )
 
 func TestGatewaySmoke(t *testing.T) {
@@ -18,7 +18,7 @@ func TestGatewaySmoke(t *testing.T) {
 		close(closeCh)
 	}()
 
-	listenAddr := pkgserver.ListenAddrFromAddress("0.0.0.0:0")
+	listenAddr := pkgnet.ListenAddrFromAddress("0.0.0.0:0")
 
 	// bound to the address so the port would be allocated now
 	_, err := listenAddr.Listener()
