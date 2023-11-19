@@ -1,4 +1,4 @@
-module github.com/faustuzas/tcha
+module github.com/faustuzas/occa
 
 go 1.21.1
 

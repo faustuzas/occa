@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/faustuzas/tcha/src/gateway"
-	pkgconfig "github.com/faustuzas/tcha/src/pkg/config"
+	"github.com/faustuzas/occa/src/gateway"
+	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
 )
 
 var configFile = flag.String("f", "", "configuration file")

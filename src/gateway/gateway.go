@@ -10,9 +10,10 @@ import (
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 
-	gatewayclient "github.com/faustuzas/tcha/src/gateway/client"
-	pkgconfig "github.com/faustuzas/tcha/src/pkg/config"
-	pkgserver "github.com/faustuzas/tcha/src/pkg/server"
+	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
+	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
+	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
+	pkgserver "github.com/faustuzas/occa/src/pkg/server"
 )
 
 type Configuration struct {
@@ -76,8 +77,10 @@ func Start(p Params) error {
 	return nil
 }
 
-func configureRoutes(_ Params) (http.Handler, error) {
+func configureRoutes(p Params) (http.Handler, error) {
 	r := mux.NewRouter()
+
+	r.Use(httpmiddleware.RequestLogger(p.Logger))
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
@@ -99,6 +102,10 @@ func configureRoutes(_ Params) (http.Handler, error) {
 			return
 		}
 	}).Methods(http.MethodPost)
+
+	r.HandleFunc("/active-users", func(w http.ResponseWriter, r *http.Request) {
+
+	})
 
 	return r, nil
 }

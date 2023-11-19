@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	pkghttp "github.com/faustuzas/tcha/src/pkg/http"
+	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 )
 
 type Client struct {

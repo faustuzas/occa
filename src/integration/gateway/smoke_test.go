@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/faustuzas/tcha/src/gateway"
-	"github.com/faustuzas/tcha/src/integration/helpers"
-	pkgserver "github.com/faustuzas/tcha/src/pkg/server"
+	"github.com/faustuzas/occa/src/gateway"
+	"github.com/faustuzas/occa/src/integration/helpers"
+	pkgserver "github.com/faustuzas/occa/src/pkg/server"
 )
 
 func TestGatewaySmoke(t *testing.T) {
