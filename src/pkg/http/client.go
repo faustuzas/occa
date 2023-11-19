@@ -26,17 +26,29 @@ type Response struct {
 }
 
 func (c Client) Get(ctx context.Context, path string) (Response, error) {
-	return c.execute(ctx, http.MethodGet, path, nil)
+	return c.execute(ctx, http.MethodGet, path, nil, nil)
+}
+
+func (c Client) GetWithHeaders(ctx context.Context, path string, headers map[string]string) (Response, error) {
+	return c.execute(ctx, http.MethodGet, path, nil, headers)
 }
 
 func (c Client) Post(ctx context.Context, path string, body []byte) (Response, error) {
-	return c.execute(ctx, http.MethodPost, path, body)
+	return c.execute(ctx, http.MethodPost, path, body, nil)
 }
 
-func (c Client) execute(ctx context.Context, method, path string, body []byte) (Response, error) {
+func (c Client) PostWithHeaders(ctx context.Context, path string, body []byte, headers map[string]string) (Response, error) {
+	return c.execute(ctx, http.MethodPost, path, body, headers)
+}
+
+func (c Client) execute(ctx context.Context, method, path string, body []byte, headers map[string]string) (Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, c.url(path), bytes.NewReader(body))
 	if err != nil {
 		return Response{}, fmt.Errorf("creating request: %w", err)
+	}
+
+	for k, v := range headers {
+		req.Header.Add(k, v)
 	}
 
 	res, err := c.client.Do(req)

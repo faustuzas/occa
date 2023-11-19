@@ -13,13 +13,15 @@ import (
 	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
-	pkgserver "github.com/faustuzas/occa/src/pkg/server"
+	pkgnet "github.com/faustuzas/occa/src/pkg/net"
+	pkgredis "github.com/faustuzas/occa/src/pkg/redis"
 )
 
 type Configuration struct {
 	pkgconfig.CommonConfiguration `yaml:",inline"`
 
-	ServerListenAddress *pkgserver.ListenAddr `yaml:"listenAddress"`
+	ServerListenAddress *pkgnet.ListenAddr     `yaml:"listenAddress"`
+	Redis               pkgredis.Configuration `yaml:"redis"`
 }
 
 type Params struct {
@@ -78,6 +80,11 @@ func Start(p Params) error {
 }
 
 func configureRoutes(p Params) (http.Handler, error) {
+	redisClient, err := p.Configuration.Redis.BuildClient()
+	if err != nil {
+		return nil, fmt.Errorf("building redis client: %w", err)
+	}
+
 	r := mux.NewRouter()
 
 	r.Use(httpmiddleware.RequestLogger(p.Logger))
@@ -94,9 +101,19 @@ func configureRoutes(p Params) (http.Handler, error) {
 			return
 		}
 
+		if err := redisClient.PutIntoCollectionWithTTL(
+			r.Context(), "active_users",
+			req.Username,
+			"",
+			30*time.Second,
+		); err != nil {
+			fmt.Printf("was not able to write into redis: %v\n", err)
+			return
+		}
+
 		w.WriteHeader(200)
 		resp := gatewayclient.AuthenticationResponse{
-			Token: fmt.Sprintf("token-%v-%v", req.Username, req.Password),
+			Token: fmt.Sprintf("token-%v", req.Username),
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			fmt.Printf(":(( %v\n", err)
@@ -104,9 +121,47 @@ func configureRoutes(p Params) (http.Handler, error) {
 		}
 	}).Methods(http.MethodPost)
 
-	r.HandleFunc("/active-users", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		if token == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
-	})
+		username := token[len("token-"):]
+		if err := redisClient.PutIntoCollectionWithTTL(
+			r.Context(), "active_users",
+			username,
+			"",
+			30*time.Second,
+		); err != nil {
+			fmt.Printf("was not able to write into redis: %v\n", err)
+			return
+		}
+		w.WriteHeader(200)
+	}).Methods(http.MethodPost)
+
+	r.HandleFunc("/active-users", func(w http.ResponseWriter, r *http.Request) {
+		activeUsers, err := redisClient.ListCollection(r.Context(), "active_users")
+		if err != nil {
+			fmt.Printf("was not to read from redis: %v\n", err)
+			return
+		}
+
+		users := make([]string, 0, len(activeUsers))
+		for usr := range activeUsers {
+			users = append(users, usr)
+		}
+
+		w.WriteHeader(200)
+		resp := gatewayclient.ActiveUsersResponse{
+			ActiveUsers: users,
+		}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			fmt.Printf(":(( %v\n", err)
+			return
+		}
+	}).Methods(http.MethodGet)
 
 	return r, nil
 }

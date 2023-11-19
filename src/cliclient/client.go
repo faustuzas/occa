@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"strconv"
 
+	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh/terminal"
 
 	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
@@ -19,22 +22,36 @@ type Configuration struct {
 }
 
 func Run(params Params) {
+	logger, err := zap.NewDevelopmentConfig().Build(zap.AddStacktrace(zap.ErrorLevel))
+	if err != nil {
+		panic(err)
+	}
+
+	gatewayClient := gatewayclient.New(params.GatewayAddress, logger)
+
 	app := cliClientApplication{
 		Params:  params,
-		gateway: gatewayclient.New(params.GatewayAddress),
+		gateway: gatewayClient,
 		console: Console{},
 	}
+
+	app.preExistHooks = append(app.preExistHooks, gatewayClient.Close)
 
 	steps := []func() bool{
 		app.printIntro,
 		app.checkGatewayConnectivity,
 		app.authentication,
+		app.mainMenu,
 	}
 
 	for _, stage := range steps {
 		if !stage() {
 			return
 		}
+	}
+
+	for _, h := range app.preExistHooks {
+		h()
 	}
 }
 
@@ -43,6 +60,8 @@ type cliClientApplication struct {
 
 	gateway *gatewayclient.Client
 	console Console
+
+	preExistHooks []func()
 }
 
 func (a cliClientApplication) printIntro() bool {
@@ -80,6 +99,60 @@ func (a cliClientApplication) ctx() context.Context {
 	return context.Background()
 }
 
+func (a cliClientApplication) mainMenu() bool {
+	a.printMenu()
+
+	for {
+		a.console.PrintNewLine()
+		res := a.console.Prompt("Select the option by entering the number and hitting Enter")
+		option, err := strconv.Atoi(res)
+		if err != nil {
+			a.console.PrintRegular("Failed to parse the option. Reason: %v", err)
+			continue
+		}
+
+		var action func()
+		switch option {
+		case 1:
+			action = a.printActiveUsers
+		case 2:
+			action = a.printMenu
+		case 3:
+			a.console.PrintNewLine()
+			a.console.PrintRegular("Good bye!")
+			return false
+		default:
+			a.console.PrintRegular("Option %d not recognized", option)
+			continue
+		}
+
+		action()
+	}
+}
+
+func (a cliClientApplication) printMenu() {
+	a.console.ClearScreen()
+
+	a.console.PrintHeader("MENU")
+	a.console.PrintRegular("1. Print active users")
+	a.console.PrintRegular("2. Clear screen")
+	a.console.PrintRegular("3. Exit")
+}
+
+func (a cliClientApplication) printActiveUsers() {
+	users, err := a.gateway.ActiveUsers(a.ctx())
+	if err != nil {
+		a.console.PrintRegular("Failed to fetch active users. Reason: %v", err)
+		return
+	}
+
+	a.console.PrintRegular("Active users:")
+	for _, u := range users {
+		a.console.PrintRegular("* %s", u)
+	}
+	a.console.PrintNewLine()
+}
+
 type Console struct {
 }
 
@@ -114,4 +187,10 @@ func (c Console) PromptPassword(text string) string {
 	}
 	fmt.Println()
 	return string(password)
+}
+
+func (c Console) ClearScreen() {
+	cmd := exec.Command("clear")
+	cmd.Stdout = os.Stdout
+	_ = cmd.Run()
 }

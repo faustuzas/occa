@@ -2,12 +2,6 @@ version: "3.7"
 
 services:
   redis:
-    image: grafana/grafana-oss:latest
+    image: redis:7.2.3
     ports:
-      - 3000:3000
-    volumes:
-      - grafana:/var/lib/grafana
-
-volumes:
-  prom:
-  grafana:
+      - "6379:6379"
