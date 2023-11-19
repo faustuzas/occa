@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/crypto/ssh/terminal"
 
-	gatewayclient "github.com/faustuzas/tcha/src/gateway/client"
+	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
 )
 
 type Params struct {

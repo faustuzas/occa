@@ -1,0 +1,13 @@
+version: "3.7"
+
+services:
+  redis:
+    image: grafana/grafana-oss:latest
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana:/var/lib/grafana
+
+volumes:
+  prom:
+  grafana:
