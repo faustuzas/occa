@@ -94,6 +94,7 @@ func configureRoutes(p Params) (http.Handler, error) {
 			return
 		}
 
+		w.WriteHeader(200)
 		resp := gatewayclient.AuthenticationResponse{
 			Token: fmt.Sprintf("token-%v-%v", req.Username, req.Password),
 		}
