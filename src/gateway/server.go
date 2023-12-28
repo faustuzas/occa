@@ -15,13 +15,15 @@ import (
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
 	pkgredis "github.com/faustuzas/occa/src/pkg/redis"
+	pkgservice "github.com/faustuzas/occa/src/pkg/service"
 )
 
 type Configuration struct {
 	pkgconfig.CommonConfiguration `yaml:",inline"`
 
-	ServerListenAddress *pkgnet.ListenAddr     `yaml:"listenAddress"`
-	Redis               pkgredis.Configuration `yaml:"redis"`
+	ServerListenAddress *pkgnet.ListenAddr `yaml:"listenAddress"`
+
+	Redis *pkgservice.ExternalService[pkgredis.Client, pkgredis.Configuration] `yaml:"redis"`
 }
 
 type Params struct {
@@ -36,6 +38,14 @@ type Params struct {
 // Returns error in case initialisation failed.
 func Start(p Params) error {
 	logger := p.Logger
+
+	listener, err := p.ServerListenAddress.Listener()
+	if err != nil {
+		return fmt.Errorf("unable to listen: %w", err)
+	}
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	routes, err := configureRoutes(p)
 	if err != nil {
@@ -52,12 +62,6 @@ func Start(p Params) error {
 		srvErrCh = make(chan error, 1)
 	)
 	go func() {
-		listener, err := p.ServerListenAddress.Listener()
-		if err != nil {
-			srvErrCh <- err
-			return
-		}
-
 		logger.Info("starting server", zap.Stringer("address", p.ServerListenAddress))
 
 		err = srv.Serve(listener)
@@ -80,7 +84,7 @@ func Start(p Params) error {
 }
 
 func configureRoutes(p Params) (http.Handler, error) {
-	redisClient, err := p.Configuration.Redis.BuildClient()
+	redisClient, err := p.Configuration.Redis.GetService()
 	if err != nil {
 		return nil, fmt.Errorf("building redis client: %w", err)
 	}
@@ -89,7 +93,7 @@ func configureRoutes(p Params) (http.Handler, error) {
 	r.Use(httpmiddleware.RequestLogger(p.Logger))
 
 	r.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		return "ok", nil
+		return pkghttp.DefaultOKResponse(), nil
 	}).Methods(http.MethodGet)
 
 	r.HandleJSONFunc("/authenticate", func(w http.ResponseWriter, r *http.Request) (any, error) {
@@ -127,7 +131,7 @@ func configureRoutes(p Params) (http.Handler, error) {
 		); err != nil {
 			return nil, fmt.Errorf("writing into redis: %w", err)
 		}
-		return "ok", nil
+		return pkghttp.DefaultOKResponse(), nil
 	}).Methods(http.MethodPost)
 
 	r.HandleJSONFunc("/active-users", func(w http.ResponseWriter, r *http.Request) (any, error) {

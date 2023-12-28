@@ -8,13 +8,15 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+//go:generate sh -c "mockgen -package=redis -destination=redis_mock.go . Client "
+
 type Configuration struct {
 	Address  string `yaml:"address"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 }
 
-func (c Configuration) BuildClient() (Client, error) {
+func (c Configuration) Build() (Client, error) {
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     c.Address,
 		Username: c.User,

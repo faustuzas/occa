@@ -36,7 +36,18 @@ func RespondWithJSON(l *zap.Logger, w http.ResponseWriter, val interface{}) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add(HeaderContentType, ContentTypeJSON)
 
-	if err := json.NewEncoder(w).Encode(val); err != nil {
+	var err error
+	if str, ok := val.(string); ok {
+		_, err = w.Write([]byte(str))
+	} else {
+		err = json.NewEncoder(w).Encode(val)
+	}
+
+	if err != nil {
 		l.Error("failed to write response into request", zap.Error(err))
 	}
+}
+
+func DefaultOKResponse() string {
+	return `{"status": "ok"}`
 }
