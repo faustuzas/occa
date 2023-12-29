@@ -11,15 +11,26 @@ import (
 
 	"github.com/faustuzas/occa/src/gateway"
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
+	pkgauthdb "github.com/faustuzas/occa/src/pkg/auth/db"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
+	pkginmemorydb "github.com/faustuzas/occa/src/pkg/inmemorydb"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
-	pkgredis "github.com/faustuzas/occa/src/pkg/redis"
 	pkgservice "github.com/faustuzas/occa/src/pkg/service"
 	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
 func TestGatewaySmoke(t *testing.T) {
-	ctrl := gomock.NewController(t)
+	var (
+		ctrl = gomock.NewController(t)
+
+		usersDB = pkgauthdb.NewMockUsers(ctrl)
+		store   = pkginmemorydb.NewMockStore(ctrl)
+	)
+
+	usersDB.EXPECT().Start().Return(nil).AnyTimes()
+	usersDB.EXPECT().Close().Return(nil).AnyTimes()
+
+	store.EXPECT().Close().Return(nil).AnyTimes()
 
 	closeCh := make(chan struct{})
 	defer func() {
@@ -37,8 +48,12 @@ func TestGatewaySmoke(t *testing.T) {
 			Configuration: gateway.Configuration{
 				ServerListenAddress: listenAddr,
 
-				Redis: pkgservice.FromImplementation[pkgredis.Client, pkgredis.Configuration](pkgredis.NewMockClient(ctrl)),
-				Auth:  pkgauth.ValidatorConfiguration{Type: pkgauth.ValidatorConfigurationNoop},
+				InMemoryDB: pkgservice.FromImplementation[pkginmemorydb.Store, pkginmemorydb.Configuration](store),
+				Auth:       pkgauth.ValidatorConfiguration{Type: pkgauth.ValidatorConfigurationNoop},
+				Registerer: pkgauth.RegistererConfiguration{
+					UsersDB:     pkgservice.FromImplementation[pkgauthdb.Users, pkgauth.UsersConfiguration](usersDB),
+					TokenIssuer: pkgservice.FromImplementation[pkgauth.TokenIssuer, pkgauth.TokenIssuerConfiguration](pkgauth.NewMockTokenIssuer(ctrl)),
+				},
 			},
 			Logger:   pkgtest.Logger,
 			Registry: prometheus.NewRegistry(),

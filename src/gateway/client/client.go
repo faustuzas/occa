@@ -50,8 +50,8 @@ func (c *Client) CheckAvailability(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) Authenticate(ctx context.Context, name string, password string) error {
-	req := AuthenticationRequest{
+func (c *Client) Login(ctx context.Context, name string, password string) error {
+	req := LoginRequest{
 		Username: name,
 		Password: password,
 	}
@@ -61,7 +61,7 @@ func (c *Client) Authenticate(ctx context.Context, name string, password string)
 		return fmt.Errorf("marshaling request: %w", err)
 	}
 
-	httpResp, err := c.client.Post(ctx, "/authenticate", body)
+	httpResp, err := c.client.Post(ctx, "/login", body)
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}
@@ -70,7 +70,7 @@ func (c *Client) Authenticate(ctx context.Context, name string, password string)
 		return fmt.Errorf("server responded with status code %d and body: %s", httpResp.StatusCode, httpResp.Body)
 	}
 
-	var resp AuthenticationResponse
+	var resp LoginResponse
 	if err = json.Unmarshal(httpResp.Body, &resp); err != nil {
 		return fmt.Errorf("unmarshaling response: %w", err)
 	}

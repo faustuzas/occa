@@ -40,7 +40,7 @@ func Run(params Params) {
 	steps := []func() bool{
 		app.printIntro,
 		app.checkGatewayConnectivity,
-		app.authentication,
+		app.login,
 		app.mainMenu,
 	}
 
@@ -79,18 +79,18 @@ func (a cliClientApplication) checkGatewayConnectivity() bool {
 	return true
 }
 
-func (a cliClientApplication) authentication() bool {
+func (a cliClientApplication) login() bool {
 	a.console.PrintNewLine()
 
 	userName := a.console.Prompt("Enter your user name")
 	password := a.console.PromptPassword("Enter your password")
 
 	a.console.PrintNewLine()
-	if err := a.gateway.Authenticate(a.ctx(), userName, password); err != nil {
-		a.console.PrintRegular("Failed to authenticate. Reason: %v", err)
+	if err := a.gateway.Login(a.ctx(), userName, password); err != nil {
+		a.console.PrintRegular("Failed to login. Reason: %v", err)
 		return false
 	}
-	a.console.PrintRegular("Authenticated successfully. Welcome back, %v!", userName)
+	a.console.PrintRegular("Login successfully. Welcome back, %v!", userName)
 
 	return true
 }

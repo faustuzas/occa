@@ -1,13 +1,22 @@
 package client
 
-type AuthenticationRequest struct {
+type RegistrationRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-type AuthenticationResponse struct {
+type RegistrationResponse struct {
 	Error string `json:"error,omitempty"`
+}
+
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
 	Token string `json:"token,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 
 type ActiveUsersResponse struct {

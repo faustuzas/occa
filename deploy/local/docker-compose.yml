@@ -19,6 +19,15 @@ services:
       - "3000:3000"
     volumes:
       - grafana:/var/lib/grafana
+  mysql:
+    image: mysql:latest
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql:/var/lib/mysq
 volumes:
   prom:
   grafana:
+  mysql:

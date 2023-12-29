@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	pkgerrors "github.com/faustuzas/occa/src/pkg/errors"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
 )
@@ -21,7 +22,7 @@ func HTTPTokenAuthorizationMiddleware(l *zap.Logger, validator TokenValidator) h
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")
 			if token == "" {
-				pkghttp.RespondWithJSONError(l, w, pkghttp.ErrUnauthorized(fmt.Errorf("missing Authorization header")))
+				pkghttp.RespondWithJSONError(l, w, pkgerrors.ErrUnauthorized(fmt.Errorf("missing Authorization header")))
 				return
 			}
 
@@ -31,7 +32,7 @@ func HTTPTokenAuthorizationMiddleware(l *zap.Logger, validator TokenValidator) h
 
 			principal, err := validator.Validate(token)
 			if err != nil {
-				pkghttp.RespondWithJSONError(l, w, pkghttp.ErrUnauthorized(err))
+				pkghttp.RespondWithJSONError(l, w, pkgerrors.ErrUnauthorized(err))
 				return
 			}
 

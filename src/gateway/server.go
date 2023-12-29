@@ -16,8 +16,8 @@ import (
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
+	pkginmemorydb "github.com/faustuzas/occa/src/pkg/inmemorydb"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
-	pkgredis "github.com/faustuzas/occa/src/pkg/redis"
 	pkgservice "github.com/faustuzas/occa/src/pkg/service"
 )
 
@@ -26,8 +26,9 @@ type Configuration struct {
 
 	ServerListenAddress *pkgnet.ListenAddr `yaml:"listenAddress"`
 
-	Redis *pkgservice.ExternalService[pkgredis.Client, pkgredis.Configuration] `yaml:"redis"`
-	Auth  pkgauth.ValidatorConfiguration                                       `yaml:"auth"`
+	InMemoryDB *pkgservice.ExternalService[pkginmemorydb.Store, pkginmemorydb.Configuration] `yaml:"inMemoryDB"`
+	Auth       pkgauth.ValidatorConfiguration                                                `yaml:"auth"`
+	Registerer pkgauth.RegistererConfiguration                                               `yaml:"registerer"`
 }
 
 type Params struct {
@@ -52,10 +53,15 @@ func Start(p Params) error {
 		_ = listener.Close()
 	}()
 
-	services, err := p.ConfigureServices()
+	services, err := p.StartServices()
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if e := services.Close(); e != nil {
+			logger.Error("error while closing services", zap.Error(e))
+		}
+	}()
 
 	routes, err := configureRoutes(p, services)
 	if err != nil {
@@ -101,43 +107,49 @@ func configureRoutes(p Params, services Services) (http.Handler, error) {
 	instrumentedRouter := rawRouter.SubGroup().
 		With(httpmiddleware.BasicMetrics(p.Registry), httpmiddleware.RequestLogger(p.Logger))
 
-	authenticatedRouter := instrumentedRouter.SubGroup().
-		With(services.HTTPAuthMiddleware)
-
 	instrumentedRouter.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		return pkghttp.DefaultOKResponse(), nil
 	}).Methods(http.MethodGet)
 
-	authenticatedRouter.HandleJSONFunc("/authenticate", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		var req gatewayclient.AuthenticationRequest
+	instrumentedRouter.HandleJSONFunc("/register", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		var req gatewayclient.RegistrationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			return nil, err
 		}
 
-		if err := services.Redis.SetCollectionItemWithTTL(
-			r.Context(), "active_users",
-			req.Username,
-			"",
-			30*time.Second,
-		); err != nil {
+		err := services.AuthRegisterer.Register(req.Username, req.Password)
+		if err != nil {
 			return nil, err
 		}
 
-		return gatewayclient.AuthenticationResponse{
-			Token: fmt.Sprintf("token-%v", req.Username),
+		return pkghttp.DefaultOKResponse(), nil
+	}).Methods(http.MethodPost)
+
+	instrumentedRouter.HandleJSONFunc("/login", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		var req gatewayclient.LoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			return nil, err
+		}
+
+		token, err := services.AuthRegisterer.Login(req.Username, req.Password)
+		if err != nil {
+			return nil, err
+		}
+
+		return gatewayclient.LoginResponse{
+			Token: token,
 		}, nil
 	}).Methods(http.MethodPost)
 
-	authenticatedRouter.HandleJSONFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		token := r.Header.Get("Authorization")
-		if token == "" {
-			return nil, pkghttp.ErrUnauthorized(fmt.Errorf("missing token"))
-		}
+	authenticatedRouter := instrumentedRouter.SubGroup().
+		With(services.HTTPAuthMiddleware)
 
-		username := token[len("token-"):]
-		if err := services.Redis.SetCollectionItemWithTTL(
+	authenticatedRouter.HandleJSONFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		principal := pkgauth.PrincipalFromContext(r.Context())
+
+		if err := services.InMemoryDB.SetCollectionItemWithTTL(
 			r.Context(), "active_users",
-			username,
+			principal.UserName,
 			"",
 			30*time.Second,
 		); err != nil {
@@ -147,7 +159,7 @@ func configureRoutes(p Params, services Services) (http.Handler, error) {
 	}).Methods(http.MethodPost)
 
 	authenticatedRouter.HandleJSONFunc("/active-users", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		activeUsers, err := services.Redis.ListCollectionKeys(r.Context(), "active_users")
+		activeUsers, err := services.InMemoryDB.ListCollectionKeys(r.Context(), "active_users")
 		if err != nil {
 			return nil, fmt.Errorf("was not to read from redis: %w", err)
 		}

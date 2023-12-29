@@ -4,10 +4,21 @@ logger:
 
 listenAddress: 0.0.0.0:9000
 
-redis:
+inMemoryDB:
   address: localhost:6379
 
 auth:
-  type: jwt_rsa
+  type: jwtRSA
   jwt:
     publicKeyPath: ./tmp/keys/occa_pub
+
+registerer:
+  jwt:
+    privateKeyPath: ./tmp/keys/occa
+  database:
+    dbType: mysql
+    host: localhost
+    port: 3306
+    database: auth
+    username: root
+    password: root

@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -18,8 +17,9 @@ func main() {
 	flag.Parse()
 
 	if len(*configFile) == 0 {
-		flag.Usage()
-		os.Exit(1)
+		*configFile = "deploy/config/gateway.yml"
+		//flag.Usage()
+		//os.Exit(1)
 	}
 
 	config, err := pkgconfig.LoadConfig[gateway.Configuration](*configFile)
