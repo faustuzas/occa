@@ -1,5 +1,11 @@
 BIN_DIR=./bin
+TMP_DIR=./tmp
 CONFIG_DIR=./deploy/config
+
+generate-rsa-key-pair:
+	mkdir -p $(TMP_DIR)/keys
+	openssl genpkey -algorithm RSA -out $(TMP_DIR)/keys/occa &> /dev/null
+	openssl rsa -pubout -in $(TMP_DIR)/keys/occa -out $(TMP_DIR)/keys/occa_pub &> /dev/null
 
 setup-env:
 	docker-compose -p occa -f deploy/local/docker-compose.yml down

@@ -6,3 +6,8 @@ listenAddress: 0.0.0.0:9000
 
 redis:
   address: localhost:6379
+
+auth:
+  type: jwt_rsa
+  jwt:
+    publicKeyPath: ./tmp/keys/occa_pub

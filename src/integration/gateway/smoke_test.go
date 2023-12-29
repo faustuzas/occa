@@ -10,6 +10,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/faustuzas/occa/src/gateway"
+	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
 	pkgredis "github.com/faustuzas/occa/src/pkg/redis"
@@ -37,6 +38,7 @@ func TestGatewaySmoke(t *testing.T) {
 				ServerListenAddress: listenAddr,
 
 				Redis: pkgservice.FromImplementation[pkgredis.Client, pkgredis.Configuration](pkgredis.NewMockClient(ctrl)),
+				Auth:  pkgauth.ValidatorConfiguration{Type: pkgauth.ValidatorConfigurationNoop},
 			},
 			Logger:   pkgtest.Logger,
 			Registry: prometheus.NewRegistry(),

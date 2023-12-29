@@ -16,7 +16,7 @@ type principalKey int
 
 var key principalKey
 
-func HTTPMiddleware(l *zap.Logger, validator TokenValidator) httpmiddleware.Middleware {
+func HTTPTokenAuthorizationMiddleware(l *zap.Logger, validator TokenValidator) httpmiddleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")
@@ -36,8 +36,6 @@ func HTTPMiddleware(l *zap.Logger, validator TokenValidator) httpmiddleware.Midd
 			}
 
 			r = r.WithContext(context.WithValue(r.Context(), key, principal))
-
-			l.Info("received request with Authorization header", zap.String("token", token))
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -45,4 +43,13 @@ func HTTPMiddleware(l *zap.Logger, validator TokenValidator) httpmiddleware.Midd
 
 func PrincipalFromContext(ctx context.Context) Principal {
 	return ctx.Value(key).(Principal)
+}
+
+func NoopMiddleware() httpmiddleware.Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r = r.WithContext(context.WithValue(r.Context(), key, noopPrincipal))
+			next.ServeHTTP(w, r)
+		})
+	}
 }

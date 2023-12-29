@@ -34,29 +34,18 @@ func (c Configuration) Build() (Client, error) {
 }
 
 type Client interface {
-	PutIntoCollectionWithTTL(ctx context.Context, collection string, key string, value string, ttl time.Duration) error
-	ListCollection(ctx context.Context, collection string) (map[string]string, error)
+	SetCollectionItemWithTTL(ctx context.Context, collection string, key string, value string, ttl time.Duration) error
+	ListCollectionKeys(ctx context.Context, collection string) ([]string, error)
 }
 
 type client struct {
 	c *redis.Client
 }
 
-func (c client) PutIntoCollectionWithTTL(ctx context.Context, collection string, key string, value string, ttl time.Duration) error {
+func (c client) SetCollectionItemWithTTL(ctx context.Context, collection string, key string, value string, ttl time.Duration) error {
 	return c.c.Set(ctx, collection+":"+key, value, ttl).Err()
 }
 
-func (c client) ListCollection(ctx context.Context, collection string) (map[string]string, error) {
-	keys, err := c.c.Keys(ctx, collection+":*").Result()
-	if err != nil {
-		return nil, fmt.Errorf("getting keys: %w", err)
-	}
-
-	result := make(map[string]string, len(keys))
-	for _, k := range keys {
-		k = k[len(collection)+1:]
-		result[k] = ""
-	}
-
-	return result, nil
+func (c client) ListCollectionKeys(ctx context.Context, collection string) ([]string, error) {
+	return c.c.Keys(ctx, collection+":*").Result()
 }

@@ -27,6 +27,7 @@ type Configuration struct {
 	ServerListenAddress *pkgnet.ListenAddr `yaml:"listenAddress"`
 
 	Redis *pkgservice.ExternalService[pkgredis.Client, pkgredis.Configuration] `yaml:"redis"`
+	Auth  pkgauth.ValidatorConfiguration                                       `yaml:"auth"`
 }
 
 type Params struct {
@@ -51,7 +52,12 @@ func Start(p Params) error {
 		_ = listener.Close()
 	}()
 
-	routes, err := configureRoutes(p)
+	services, err := p.ConfigureServices()
+	if err != nil {
+		return err
+	}
+
+	routes, err := configureRoutes(p, services)
 	if err != nil {
 		return fmt.Errorf("configuring routes: %v", err)
 	}
@@ -87,35 +93,28 @@ func Start(p Params) error {
 	return nil
 }
 
-func configureRoutes(p Params) (http.Handler, error) {
-	redisClient, err := p.Configuration.Redis.GetService()
-	if err != nil {
-		return nil, fmt.Errorf("building redis client: %w", err)
-	}
-
-	r := pkghttp.NewRouterBuilder(p.Logger)
-	r.HandleFunc("/metrics", promhttp.HandlerFor(p.Registry, promhttp.HandlerOpts{}).ServeHTTP).
+func configureRoutes(p Params, services Services) (http.Handler, error) {
+	rawRouter := pkghttp.NewRouterBuilder(p.Logger)
+	rawRouter.HandleFunc("/metrics", promhttp.HandlerFor(p.Registry, promhttp.HandlerOpts{}).ServeHTTP).
 		Methods(http.MethodGet)
 
-	serviceMiddlewares := []httpmiddleware.Middleware{
-		httpmiddleware.BasicMetrics(p.Registry),
-		httpmiddleware.RequestLogger(p.Logger),
-		pkgauth.HTTPMiddleware(p.Logger),
-	}
+	instrumentedRouter := rawRouter.SubGroup().
+		With(httpmiddleware.BasicMetrics(p.Registry), httpmiddleware.RequestLogger(p.Logger))
 
-	serviceRouter := r.SubGroup().With(serviceMiddlewares...)
+	authenticatedRouter := instrumentedRouter.SubGroup().
+		With(services.HTTPAuthMiddleware)
 
-	serviceRouter.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
+	instrumentedRouter.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		return pkghttp.DefaultOKResponse(), nil
 	}).Methods(http.MethodGet)
 
-	serviceRouter.HandleJSONFunc("/authenticate", func(w http.ResponseWriter, r *http.Request) (any, error) {
+	authenticatedRouter.HandleJSONFunc("/authenticate", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		var req gatewayclient.AuthenticationRequest
-		if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			return nil, err
 		}
 
-		if err = redisClient.PutIntoCollectionWithTTL(
+		if err := services.Redis.SetCollectionItemWithTTL(
 			r.Context(), "active_users",
 			req.Username,
 			"",
@@ -129,14 +128,14 @@ func configureRoutes(p Params) (http.Handler, error) {
 		}, nil
 	}).Methods(http.MethodPost)
 
-	serviceRouter.HandleJSONFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) (any, error) {
+	authenticatedRouter.HandleJSONFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		token := r.Header.Get("Authorization")
 		if token == "" {
 			return nil, pkghttp.ErrUnauthorized(fmt.Errorf("missing token"))
 		}
 
 		username := token[len("token-"):]
-		if err := redisClient.PutIntoCollectionWithTTL(
+		if err := services.Redis.SetCollectionItemWithTTL(
 			r.Context(), "active_users",
 			username,
 			"",
@@ -147,21 +146,16 @@ func configureRoutes(p Params) (http.Handler, error) {
 		return pkghttp.DefaultOKResponse(), nil
 	}).Methods(http.MethodPost)
 
-	serviceRouter.HandleJSONFunc("/active-users", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		activeUsers, err := redisClient.ListCollection(r.Context(), "active_users")
+	authenticatedRouter.HandleJSONFunc("/active-users", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		activeUsers, err := services.Redis.ListCollectionKeys(r.Context(), "active_users")
 		if err != nil {
 			return nil, fmt.Errorf("was not to read from redis: %w", err)
 		}
 
-		users := make([]string, 0, len(activeUsers))
-		for usr := range activeUsers {
-			users = append(users, usr)
-		}
-
 		return gatewayclient.ActiveUsersResponse{
-			ActiveUsers: users,
+			ActiveUsers: activeUsers,
 		}, nil
 	}).Methods(http.MethodGet)
 
-	return r.Build(), nil
+	return rawRouter.Build(), nil
 }

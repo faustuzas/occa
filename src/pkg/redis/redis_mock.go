@@ -35,31 +35,31 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
-// ListCollection mocks base method.
-func (m *MockClient) ListCollection(arg0 context.Context, arg1 string) (map[string]string, error) {
+// ListCollectionKeys mocks base method.
+func (m *MockClient) ListCollectionKeys(arg0 context.Context, arg1 string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListCollection", arg0, arg1)
-	ret0, _ := ret[0].(map[string]string)
+	ret := m.ctrl.Call(m, "ListCollectionKeys", arg0, arg1)
+	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListCollection indicates an expected call of ListCollection.
-func (mr *MockClientMockRecorder) ListCollection(arg0, arg1 interface{}) *gomock.Call {
+// ListCollectionKeys indicates an expected call of ListCollectionKeys.
+func (mr *MockClientMockRecorder) ListCollectionKeys(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCollection", reflect.TypeOf((*MockClient)(nil).ListCollection), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCollectionKeys", reflect.TypeOf((*MockClient)(nil).ListCollectionKeys), arg0, arg1)
 }
 
-// PutIntoCollectionWithTTL mocks base method.
-func (m *MockClient) PutIntoCollectionWithTTL(arg0 context.Context, arg1, arg2, arg3 string, arg4 time.Duration) error {
+// SetCollectionItemWithTTL mocks base method.
+func (m *MockClient) SetCollectionItemWithTTL(arg0 context.Context, arg1, arg2, arg3 string, arg4 time.Duration) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutIntoCollectionWithTTL", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "SetCollectionItemWithTTL", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// PutIntoCollectionWithTTL indicates an expected call of PutIntoCollectionWithTTL.
-func (mr *MockClientMockRecorder) PutIntoCollectionWithTTL(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+// SetCollectionItemWithTTL indicates an expected call of SetCollectionItemWithTTL.
+func (mr *MockClientMockRecorder) SetCollectionItemWithTTL(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutIntoCollectionWithTTL", reflect.TypeOf((*MockClient)(nil).PutIntoCollectionWithTTL), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCollectionItemWithTTL", reflect.TypeOf((*MockClient)(nil).SetCollectionItemWithTTL), arg0, arg1, arg2, arg3, arg4)
 }
