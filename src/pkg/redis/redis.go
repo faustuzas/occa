@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-//go:generate sh -c "mockgen -package=redis -destination=redis_mock.go . Client "
+//go:generate sh -c "mockgen -package=redis -destination=redis_mock.go . Client"
 
 type Configuration struct {
 	Address  string `yaml:"address"`

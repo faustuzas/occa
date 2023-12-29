@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
+	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
@@ -96,9 +97,13 @@ func configureRoutes(p Params) (http.Handler, error) {
 	r.HandleFunc("/metrics", promhttp.HandlerFor(p.Registry, promhttp.HandlerOpts{}).ServeHTTP).
 		Methods(http.MethodGet)
 
-	serviceRouter := r.
-		SubGroup().
-		With(httpmiddleware.RequestLogger(p.Logger), httpmiddleware.BasicMetrics(p.Registry))
+	serviceMiddlewares := []httpmiddleware.Middleware{
+		httpmiddleware.BasicMetrics(p.Registry),
+		httpmiddleware.RequestLogger(p.Logger),
+		pkgauth.HTTPMiddleware(p.Logger),
+	}
+
+	serviceRouter := r.SubGroup().With(serviceMiddlewares...)
 
 	serviceRouter.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		return pkghttp.DefaultOKResponse(), nil

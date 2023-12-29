@@ -10,11 +10,11 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/faustuzas/occa/src/gateway"
-	"github.com/faustuzas/occa/src/integration/helpers"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
 	pkgredis "github.com/faustuzas/occa/src/pkg/redis"
 	pkgservice "github.com/faustuzas/occa/src/pkg/service"
+	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
 func TestGatewaySmoke(t *testing.T) {
@@ -38,7 +38,7 @@ func TestGatewaySmoke(t *testing.T) {
 
 				Redis: pkgservice.FromImplementation[pkgredis.Client, pkgredis.Configuration](pkgredis.NewMockClient(ctrl)),
 			},
-			Logger:   helpers.Logger,
+			Logger:   pkgtest.Logger,
 			Registry: prometheus.NewRegistry(),
 			CloseCh:  closeCh,
 		})
@@ -48,7 +48,7 @@ func TestGatewaySmoke(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	_, body := helpers.HTTPGetBody(t, listenAddr.String(), "/health")
+	_, body := pkgtest.HTTPGetBody(t, listenAddr.String(), "/health")
 	require.Equal(t, pkghttp.DefaultOKResponse(), string(body))
 }
 

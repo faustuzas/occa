@@ -9,13 +9,13 @@ import (
 	middlewarestd "github.com/slok/go-http-metrics/middleware/std"
 )
 
-func BasicMetrics(r prometheus.Registerer) func(http.Handler) http.Handler {
+func BasicMetrics(r prometheus.Registerer) Middleware {
 	mdlw := middleware.New(middleware.Config{
 		Recorder: metrics.NewRecorder(metrics.Config{
 			Registry: r,
 		}),
 	})
-	
+
 	return func(next http.Handler) http.Handler {
 		return middlewarestd.Handler("", mdlw, next)
 	}

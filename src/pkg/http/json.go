@@ -9,7 +9,7 @@ import (
 )
 
 type JSONErrorResponse struct {
-	Details string
+	Details string `json:"details"`
 }
 
 func RespondWithJSONError(l *zap.Logger, w http.ResponseWriter, err error) {
