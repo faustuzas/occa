@@ -9,6 +9,7 @@ import (
 
 type LoggerConfiguration struct {
 	Level           string `yaml:"level"`
+	Component       string `yaml:"component"`
 	DevelopmentMode bool   `yaml:"developmentMode"`
 }
 
@@ -32,6 +33,10 @@ func (c LoggerConfiguration) Build() (*zap.Logger, error) {
 	logger, err := config.Build()
 	if err != nil {
 		return nil, fmt.Errorf("failed bulding logger: %v", err)
+	}
+
+	if c.Component != "" {
+		logger = logger.With(zap.String("component", c.Component))
 	}
 
 	return logger, nil

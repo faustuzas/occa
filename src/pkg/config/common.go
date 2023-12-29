@@ -1,5 +1,11 @@
 package config
 
+import (
+	"go.uber.org/zap"
+
+	pkgservice "github.com/faustuzas/occa/src/pkg/service"
+)
+
 type CommonConfiguration struct {
-	Logger LoggerConfiguration `yaml:"logger"`
+	Logger *pkgservice.ExternalService[*zap.Logger, LoggerConfiguration] `yaml:"logger"`
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
@@ -37,8 +38,9 @@ func TestGatewaySmoke(t *testing.T) {
 
 				Redis: pkgservice.FromImplementation[pkgredis.Client, pkgredis.Configuration](pkgredis.NewMockClient(ctrl)),
 			},
-			Logger:  helpers.Logger,
-			CloseCh: closeCh,
+			Logger:   helpers.Logger,
+			Registry: prometheus.NewRegistry(),
+			CloseCh:  closeCh,
 		})
 
 		require.NoError(t, err)

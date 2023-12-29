@@ -2,45 +2,73 @@ package http
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
 
-var _ http.Handler = (*Router)(nil)
+type RouterBuilder struct {
+	mux           *mux.Router
+	handlersAdded bool
 
-type Router struct {
-	mux mux.Router
+	middlewares []func(next http.Handler) http.Handler
 
 	logger *zap.Logger
 }
 
-func NewRouter(l *zap.Logger) *Router {
-	return &Router{
+func NewRouterBuilder(l *zap.Logger) *RouterBuilder {
+	gorilla := mux.NewRouter()
+	gorilla.Methods(http.MethodGet).Subrouter()
+
+	return &RouterBuilder{
+		mux:    mux.NewRouter(),
 		logger: l,
 	}
 }
 
-func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	r.mux.ServeHTTP(w, req)
-}
+// SubGroup is used to scope middlewares to some specific routes.
+func (b *RouterBuilder) SubGroup() *RouterBuilder {
+	return &RouterBuilder{
+		mux: b.mux,
 
-func (r *Router) Use(middlewares ...func(src http.Handler) http.Handler) {
-	mws := make([]mux.MiddlewareFunc, len(middlewares))
-	for i := range mws {
-		mws[i] = middlewares[i]
+		middlewares: slices.Clone(b.middlewares),
+		logger:      b.logger,
 	}
-
-	r.mux.Use(mws...)
 }
 
-func (r *Router) HandleJSONFunc(path string, f func(http.ResponseWriter, *http.Request) (any, error)) *mux.Route {
-	return r.mux.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
+func (b *RouterBuilder) HandleJSONFunc(path string, f func(http.ResponseWriter, *http.Request) (any, error)) *mux.Route {
+	b.handlersAdded = true
+	return b.mux.Handle(path, b.wrap(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		respObj, err := f(w, req)
 		if err != nil {
-			RespondWithJSONError(r.logger, w, err)
+			RespondWithJSONError(b.logger, w, err)
 			return
 		}
-		RespondWithJSON(r.logger, w, respObj)
-	})
+		RespondWithJSON(b.logger, w, respObj)
+	})))
+}
+
+func (b *RouterBuilder) HandleFunc(path string, h http.HandlerFunc) *mux.Route {
+	return b.mux.Handle(path, b.wrap(h))
+}
+
+func (b *RouterBuilder) wrap(h http.Handler) http.Handler {
+	for _, m := range b.middlewares {
+		h = m(h)
+	}
+	return h
+}
+
+func (b *RouterBuilder) With(middlewares ...func(src http.Handler) http.Handler) *RouterBuilder {
+	if b.handlersAdded {
+		panic("cannot add middlewares once some handlers are configured")
+	}
+
+	b.middlewares = append(b.middlewares, middlewares...)
+	return b
+}
+
+func (b *RouterBuilder) Build() http.Handler {
+	return b.mux
 }

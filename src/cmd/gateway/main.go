@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"go.uber.org/zap"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/faustuzas/occa/src/gateway"
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
@@ -28,17 +28,17 @@ func main() {
 		return
 	}
 
-	logger, err := config.Logger.Build()
+	logger, err := config.Logger.GetService()
 	if err != nil {
 		fmt.Printf("failed to configure logger: %v\n", err)
 		return
 	}
-	logger = logger.With(zap.String("component", "gateway"))
 
 	pkglaunch.WaitForInterrupt(logger, func(closeCh <-chan struct{}) error {
 		return gateway.Start(gateway.Params{
 			Configuration: config,
 			Logger:        logger,
+			Registry:      prometheus.NewRegistry(),
 			CloseCh:       closeCh,
 		})
 	})

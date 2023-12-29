@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync/atomic"
 	"time"
 
@@ -42,8 +43,8 @@ func (c *Client) CheckAvailability(ctx context.Context) error {
 		return fmt.Errorf("executing request: %w", err)
 	}
 
-	if b := string(resp.Body); "ok" != b {
-		return fmt.Errorf("gateway returned response %s", b)
+	if code := resp.StatusCode; code != http.StatusOK {
+		return fmt.Errorf("gateway returned status code %d", code)
 	}
 
 	return nil

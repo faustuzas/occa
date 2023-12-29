@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
@@ -29,7 +31,8 @@ type Configuration struct {
 type Params struct {
 	Configuration
 
-	Logger *zap.Logger
+	Logger   *zap.Logger
+	Registry *prometheus.Registry
 
 	CloseCh <-chan struct{}
 }
@@ -89,14 +92,19 @@ func configureRoutes(p Params) (http.Handler, error) {
 		return nil, fmt.Errorf("building redis client: %w", err)
 	}
 
-	r := pkghttp.NewRouter(p.Logger)
-	r.Use(httpmiddleware.RequestLogger(p.Logger))
+	r := pkghttp.NewRouterBuilder(p.Logger)
+	r.HandleFunc("/metrics", promhttp.HandlerFor(p.Registry, promhttp.HandlerOpts{}).ServeHTTP).
+		Methods(http.MethodGet)
 
-	r.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
+	serviceRouter := r.
+		SubGroup().
+		With(httpmiddleware.RequestLogger(p.Logger), httpmiddleware.BasicMetrics(p.Registry))
+
+	serviceRouter.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		return pkghttp.DefaultOKResponse(), nil
 	}).Methods(http.MethodGet)
 
-	r.HandleJSONFunc("/authenticate", func(w http.ResponseWriter, r *http.Request) (any, error) {
+	serviceRouter.HandleJSONFunc("/authenticate", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		var req gatewayclient.AuthenticationRequest
 		if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 			return nil, err
@@ -116,7 +124,7 @@ func configureRoutes(p Params) (http.Handler, error) {
 		}, nil
 	}).Methods(http.MethodPost)
 
-	r.HandleJSONFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) (any, error) {
+	serviceRouter.HandleJSONFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		token := r.Header.Get("Authorization")
 		if token == "" {
 			return nil, pkghttp.ErrUnauthorized(fmt.Errorf("missing token"))
@@ -134,7 +142,7 @@ func configureRoutes(p Params) (http.Handler, error) {
 		return pkghttp.DefaultOKResponse(), nil
 	}).Methods(http.MethodPost)
 
-	r.HandleJSONFunc("/active-users", func(w http.ResponseWriter, r *http.Request) (any, error) {
+	serviceRouter.HandleJSONFunc("/active-users", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		activeUsers, err := redisClient.ListCollection(r.Context(), "active_users")
 		if err != nil {
 			return nil, fmt.Errorf("was not to read from redis: %w", err)
@@ -150,5 +158,5 @@ func configureRoutes(p Params) (http.Handler, error) {
 		}, nil
 	}).Methods(http.MethodGet)
 
-	return r, nil
+	return r.Build(), nil
 }
