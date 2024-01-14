@@ -20,7 +20,9 @@ services:
     volumes:
       - grafana:/var/lib/grafana
   mysql:
-    image: mysql:latest
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.mysql
     ports:
       - "3306:3306"
     environment:
