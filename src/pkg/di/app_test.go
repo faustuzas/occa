@@ -2,6 +2,7 @@ package di
 
 import (
 	"container/heap"
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -104,16 +105,19 @@ func TestDI_ErrorHandling(t *testing.T) {
 			expectExecErr: "exec cannot have error as a dependency",
 		},
 		"exec cannot have return values": {
-			execFn:        func() error { return nil },
-			expectExecErr: "exec cannot have return values",
+			execFn:        func() *aService { return nil },
+			expectExecErr: "function can have only optional return error",
+		},
+		"error from exec is propagated": {
+			execFn:        func() error { return fmt.Errorf("broken") },
+			expectExecErr: "broken",
 		},
 		"starter error is propagated to exec": {
-			provider: func() cService {
-				return cService{
-					onStart: func() error {
-						return fmt.Errorf("disk is broken")
-					},
-				}
+			provider: func(lc *Lifecycle) cService {
+				lc.RegisterStarter(func(_ chan<- error, _ <-chan struct{}) error {
+					return fmt.Errorf("disk is broken")
+				})
+				return cService{}
 			},
 			execFn:        func(cService) {},
 			expectExecErr: "providing type di.cService: starting di.cService: disk is broken",
@@ -143,6 +147,7 @@ func TestDI_ErrorHandling(t *testing.T) {
 			if tt.execFn != nil {
 				eErr := app.Exec(tt.execFn)
 				if tt.expectExecErr != "" {
+					require.Error(t, eErr)
 					require.Equal(t, tt.expectExecErr, eErr.Error())
 					return
 				}
@@ -320,22 +325,18 @@ func TestDI_DuplicateRegistration(t *testing.T) {
 func TestDI_StarterDependencyIsStartedBeforeProviding(t *testing.T) {
 	app := newTestApplication()
 
-	var startCalled bool
-	require.NoError(t, app.Register(func() cService {
-		return cService{
-			onStart: func() error {
-				startCalled = true
-				return nil
-			},
-		}
+	require.NoError(t, app.Register(func(lc *Lifecycle) *aService {
+		a := &aService{}
+		lc.RegisterStarter(func(_ chan<- error, _ <-chan struct{}) error {
+			a.n = 100
+			return nil
+		})
+		return a
 	}))
 
-	var execCalled bool
-	require.NoError(t, app.Exec(func(c cService) {
-		require.True(t, startCalled)
-		execCalled = true
+	require.NoError(t, app.Exec(func(a *aService) {
+		require.Equal(t, 100, a.n)
 	}))
-	require.True(t, execCalled)
 }
 
 func TestDI_LazyDepEvaluation(t *testing.T) {
@@ -379,32 +380,36 @@ func TestDI_WaitForTerminationAndClose(t *testing.T) {
 	triggerShutdownCh := make(chan struct{})
 
 	app, err := NewApplication(Params{
-		Logger:                        pkgtest.Logger,
-		ConfigureInterruptTermination: false,
-		TerminationCh:                 triggerShutdownCh,
+		Logger:  pkgtest.Logger,
+		CloseCh: triggerShutdownCh,
 	})
 	require.NoError(t, err)
 
 	var (
-		cStopped bool
-		dStopped bool
+		aStopped bool
+		bStopped bool
 	)
 
 	require.NoError(t, app.MultiRegister(
-		func() cService {
-			return cService{onStop: func() error {
-				cStopped = true
+		func(lc *Lifecycle) *aService {
+			lc.RegisterStopper(func(_ context.Context) error {
+				aStopped = true
 				return nil
-			}}
-		},
-		func() dService {
-			return dService{onStop: func() error {
-				dStopped = true
-				return fmt.Errorf("failed to stop")
-			}}
-		}))
+			})
 
-	require.NoError(t, app.Exec(func(cService, dService) {}))
+			return &aService{}
+		},
+		func(lc *Lifecycle) bService {
+			lc.RegisterStopper(func(_ context.Context) error {
+				bStopped = true
+				return nil
+			})
+
+			return bService{}
+		},
+	))
+
+	require.NoError(t, app.Exec(func(*aService, bService) {}))
 
 	closed := make(chan struct{})
 	go func() {
@@ -420,11 +425,90 @@ func TestDI_WaitForTerminationAndClose(t *testing.T) {
 		require.Fail(t, "application did not close")
 	}
 
-	require.True(t, cStopped)
-	require.True(t, dStopped)
+	require.True(t, aStopped)
+	require.True(t, bStopped)
 }
 
-// TODO: add application constructor tests
+func TestDI_Lifecycle(t *testing.T) {
+	app := newTestApplication()
+
+	a := &aService{n: 0}
+	require.NoError(t, app.Register(func(lf *Lifecycle) *aService {
+		lf.RegisterStarter(func(_ chan<- error, _ <-chan struct{}) error {
+			a.n += 1
+			return nil
+		})
+
+		lf.RegisterStopper(func(_ context.Context) error {
+			a.n += 5
+			return nil
+		})
+
+		return a
+	}))
+
+	require.NoError(t, app.Exec(func(a *aService) {}))
+
+	app.Close()
+
+	require.Equal(t, 6, a.n)
+}
+
+func TestDI_ApplicationTerminatesOnceErrorIsSent(t *testing.T) {
+	app := newTestApplication()
+
+	var (
+		startedCh      = make(chan struct{})
+		forwardCh      = make(chan struct{})
+		appClosedAckCh = make(chan struct{})
+	)
+	require.NoError(t, app.MultiRegister(
+		func(lc *Lifecycle) *aService {
+			lc.RegisterStarter(func(errCh chan<- error, appClosedCh <-chan struct{}) error {
+				go func() {
+					<-forwardCh
+					errCh <- fmt.Errorf("broken")
+
+					<-appClosedCh
+					close(appClosedAckCh)
+
+				}()
+
+				close(startedCh)
+				return nil
+			})
+
+			return &aService{}
+		}),
+	)
+
+	closed := make(chan struct{})
+	go func() {
+		require.NoError(t, app.Exec(func(_ *aService) {}))
+		app.WaitForTerminationAndClose()
+		close(closed)
+	}()
+
+	select {
+	case <-startedCh:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "service not started")
+	}
+
+	close(forwardCh)
+
+	select {
+	case <-appClosedAckCh:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "app did not notified about closing")
+	}
+
+	select {
+	case <-closed:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "application did not close")
+	}
+}
 
 func newTestApplication() *Application {
 	app, _ := NewApplication(Params{
@@ -433,34 +517,9 @@ func newTestApplication() *Application {
 	return app
 }
 
-type dService struct {
-	onStop func() error
-}
-
-func (d dService) Stop() error {
-	return d.onStop()
-}
-
 type cService struct {
-	onStart func() error
-	onStop  func() error
-
 	a *aService
 	b bService
-}
-
-func (c cService) Start() error {
-	if f := c.onStart; f != nil {
-		return f()
-	}
-	return nil
-}
-
-func (c cService) Stop() error {
-	if f := c.onStop; f != nil {
-		return f()
-	}
-	return nil
 }
 
 type bService struct {

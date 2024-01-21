@@ -1,10 +1,10 @@
 package di
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"reflect"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -17,19 +17,33 @@ var (
 	errorType = reflect.TypeOf((*error)(nil)).Elem()
 )
 
-type Starter interface {
-	Start() error
+type StartFn func(errCh chan<- error, appClosedCh <-chan struct{}) error
+type StopFn func(ctx context.Context) error
+
+type stopper struct {
+	id string
+	fn StopFn
 }
 
-type Stopper interface {
-	Stop() error
+type Lifecycle struct {
+	start StartFn
+	stop  StopFn
+}
+
+func (l *Lifecycle) RegisterStarter(s StartFn) {
+	l.start = s
+}
+
+func (l *Lifecycle) RegisterStopper(s StopFn) {
+	l.stop = s
 }
 
 type Params struct {
 	Logger *zap.Logger
 
-	ConfigureInterruptTermination bool
-	TerminationCh                 <-chan struct{}
+	TerminationTimeout time.Duration
+
+	CloseCh <-chan struct{}
 }
 
 func (p Params) Validate() error {
@@ -44,7 +58,11 @@ type Application struct {
 
 	providers      map[reflect.Type]providerWrapper
 	singletonCache map[reflect.Type]reflect.Value
-	stoppers       []Stopper
+
+	errCh    chan error
+	closedCh chan struct{}
+
+	stoppers []stopper
 }
 
 func NewApplication(params Params) (*Application, error) {
@@ -54,6 +72,9 @@ func NewApplication(params Params) (*Application, error) {
 
 	return &Application{
 		p: params,
+
+		errCh:    make(chan error),
+		closedCh: make(chan struct{}),
 
 		providers:      map[reflect.Type]providerWrapper{},
 		singletonCache: map[reflect.Type]reflect.Value{},
@@ -118,8 +139,8 @@ func (a *Application) Exec(f any) error {
 		return fmt.Errorf("function must be provided")
 	}
 
-	if fType.NumOut() != 0 {
-		return fmt.Errorf("exec cannot have return values")
+	if fType.NumOut() > 1 || (fType.NumOut() == 1 && fType.Out(0) != errorType) {
+		return fmt.Errorf("function can have only optional return error")
 	}
 
 	arguments := make([]reflect.Value, 0, fType.NumIn())
@@ -160,18 +181,6 @@ func (a *Application) provideForType(requestedType reflect.Type, dt depTracker) 
 	}
 	a.singletonCache[requestedType] = val
 
-	if val.CanInterface() {
-		if s, ok := val.Interface().(Starter); ok {
-			if err = s.Start(); err != nil {
-				return reflect.Value{}, fmt.Errorf("starting %v: %w", requestedType, err)
-			}
-		}
-
-		if s, ok := val.Interface().(Stopper); ok {
-			a.stoppers = append(a.stoppers, s)
-		}
-	}
-
 	return val, nil
 }
 
@@ -203,9 +212,17 @@ func (a *Application) provide(pw providerWrapper, dt depTracker) (reflect.Value,
 	case reflect.Struct, reflect.Pointer:
 		return reflect.ValueOf(pw.provider), nil
 	case reflect.Func:
+		lf := &Lifecycle{}
+
 		arguments := make([]reflect.Value, 0, providerType.NumIn())
 		for i := 0; i < providerType.NumIn(); i++ {
 			requiredType := providerType.In(i)
+
+			if requiredType == reflect.TypeOf(lf) {
+				arguments = append(arguments, reflect.ValueOf(lf))
+				continue
+			}
+
 			obj, err := a.provideForType(requiredType, dt)
 			if err != nil {
 				return reflect.Value{}, fmt.Errorf("providing type %v: %w", requiredType, err)
@@ -220,44 +237,59 @@ func (a *Application) provide(pw providerWrapper, dt depTracker) (reflect.Value,
 			return reflect.Value{}, err.Elem().Interface().(error)
 		}
 
-		return returned[0], nil
+		result := returned[0]
+		if lf.start != nil {
+			if err := lf.start(a.errCh, a.closedCh); err != nil {
+				return reflect.Value{}, fmt.Errorf("starting %v: %w", result.Type(), err)
+			}
+		}
+
+		if lf.stop != nil {
+			a.stoppers = append(a.stoppers, stopper{
+				id: fmt.Sprintf("%v", result.Type()),
+				fn: lf.stop,
+			})
+		}
+
+		return result, nil
 	}
 	return reflect.Value{}, fmt.Errorf("provider type %v not supported", providerType.Kind())
 }
 
-func (a *Application) WaitForTerminationAndClose() {
-	var iCh <-chan struct{}
-	if a.p.ConfigureInterruptTermination {
-		iCh = interruptCh()
-	}
-
+func (a *Application) WaitForTermination() {
 	select {
-	case <-iCh:
-		a.p.Logger.Info("received interrupt, terminating...")
-	case <-a.p.TerminationCh:
-		a.p.Logger.Info("received a request to terminate from channel...")
-	}
-
-	for _, s := range a.stoppers {
-		if err := s.Stop(); err != nil {
-			a.p.Logger.Error("error while stopping service",
-				zap.String("service", fmt.Sprintf("%T", s)),
-				zap.Error(err))
-		}
+	case err := <-a.errCh:
+		a.p.Logger.Error("received a critical error from a running service, terminating...", zap.Error(err))
+	case <-a.p.CloseCh:
+		a.p.Logger.Info("received a request to terminate...")
 	}
 }
 
-func interruptCh() <-chan struct{} {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt)
+func (a *Application) Close() {
+	ctx := context.Background()
+	if a.p.TerminationTimeout != 0 {
+		c, cancelFn := context.WithTimeout(ctx, a.p.TerminationTimeout)
+		defer cancelFn()
 
-	resultCh := make(chan struct{})
-	go func() {
-		<-ch
-		close(resultCh)
-	}()
+		ctx = c
+	}
 
-	return resultCh
+	for _, s := range a.stoppers {
+		a.p.Logger.Debug("stopping service", zap.String("service", fmt.Sprintf("%T", s.id)))
+
+		if err := s.fn(ctx); err != nil {
+			a.p.Logger.Error("error while stopping service",
+				zap.String("service", fmt.Sprintf("%v", s.id)),
+				zap.Error(err))
+		}
+	}
+
+	close(a.closedCh)
+}
+
+func (a *Application) WaitForTerminationAndClose() {
+	a.WaitForTermination()
+	a.Close()
 }
 
 func wrapProvider(p any) providerWrapper {
@@ -269,14 +301,6 @@ func wrapProvider(p any) providerWrapper {
 type providerWrapper struct {
 	provider any
 }
-
-//func newDepTrackerFor(typ reflect.Type) *depTracker {
-//
-//}
-//
-//type depTracker struct {
-//	trackers map[]
-//}
 
 // depTracker is used to track requested dependencies in the graph to prevent circles.
 type depTracker map[reflect.Type]bool
