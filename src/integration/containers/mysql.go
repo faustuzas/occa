@@ -25,64 +25,56 @@ type MySQLContainer struct {
 }
 
 // WithMysql creates a docker MySQL container if it does not yet exist and returns an interface to interact with it.
-func WithMysql(t *testing.T) (mysql *MySQLContainer) {
-	defer func() {
-		if mysql != nil {
-			t.Cleanup(func() {
-				err := mysql.Terminate(context.Background())
-				if err != nil {
-					t.Errorf("mysql failed to terminate: %v", err)
-				}
-			})
-		}
-	}()
+func WithMysql(t *testing.T) *MySQLContainer {
+	c, err := resolve[*MySQLContainer]("mysql", t, func() (registeredContainer, error) {
+		const (
+			username = "root"
+			password = "root"
+			port     = "3306"
+		)
 
-	registry.mu.Lock()
-	defer registry.mu.Unlock()
-
-	if m := registry.mysql; m != nil {
-		registry.mysql.refCount++
-		return registry.mysql
-	}
-
-	const (
-		username = "root"
-		password = "root"
-		port     = "3306"
-	)
-
-	c, err := testcontainers.GenericContainer(context.Background(), testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Name:         "occa-mysql-test",
-			Image:        "mysql:8.2",
-			ExposedPorts: []string{fmt.Sprintf("%s/tcp", port)},
-			WaitingFor:   wait.ForLog("ready for connections"),
-			Env: map[string]string{
-				"MYSQL_ROOT_PASSWORD": password,
+		c, err := testcontainers.GenericContainer(context.Background(), testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Name:         "occa-mysql-test",
+				Image:        "mysql:8.2",
+				ExposedPorts: []string{fmt.Sprintf("%s/tcp", port)},
+				WaitingFor:   wait.ForLog("ready for connections"),
+				Env: map[string]string{
+					"MYSQL_ROOT_PASSWORD": password,
+				},
 			},
-		},
-		Started: true,
-		Reuse:   true,
+			Started: true,
+			Reuse:   true,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		natPort, err := nat.NewPort("tcp", port)
+		if err != nil {
+			return nil, err
+		}
+
+		mappedPort, err := c.MappedPort(context.Background(), natPort)
+		if err != nil {
+			return nil, err
+		}
+		mysql := &MySQLContainer{
+			Container: Container{c: c, refCount: 1},
+			Username:  username,
+			Password:  password,
+			Port:      mappedPort.Int(),
+		}
+		if err = mysql.waitForHealthy(); err != nil {
+			return nil, err
+		}
+
+		fmt.Println("[test-container] mysql initialized and ready to use!")
+
+		return mysql, nil
 	})
 	require.NoError(t, err)
-
-	natPort, err := nat.NewPort("tcp", port)
-	require.NoError(t, err)
-
-	mappedPort, err := c.MappedPort(context.Background(), natPort)
-	require.NoError(t, err)
-
-	registry.mysql = &MySQLContainer{
-		Container: Container{c: c, refCount: 1},
-		Username:  username,
-		Password:  password,
-		Port:      mappedPort.Int(),
-	}
-	require.NoError(t, registry.mysql.waitForHealthy())
-
-	fmt.Println("[test-container] mysql initialized and ready to use!")
-
-	return registry.mysql
+	return c
 }
 
 func (c *MySQLContainer) waitForHealthy() error {
