@@ -11,16 +11,10 @@ import (
 	pkglaunch "github.com/faustuzas/occa/src/pkg/launch"
 )
 
-var configFile = flag.String("f", "", "configuration file")
+var configFile = flag.String("f", "deploy/config/gateway.yml", "configuration file")
 
 func main() {
 	flag.Parse()
-
-	if len(*configFile) == 0 {
-		*configFile = "deploy/config/gateway.yml"
-		//flag.Usage()
-		//os.Exit(1)
-	}
 
 	config, err := pkgconfig.LoadConfig[gateway.Configuration](*configFile)
 	if err != nil {

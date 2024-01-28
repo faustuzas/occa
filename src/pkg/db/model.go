@@ -3,17 +3,18 @@ package db
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	pkgid "github.com/faustuzas/occa/src/pkg/id"
 )
 
 type BaseModel struct {
-	ID        uuid.UUID `gorm:"primary_key"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        string    `gorm:"primary_key;size:36"`
+	CreatedAt time.Time `gorm:"not null"`
+	UpdatedAt time.Time `gorm:"not null"`
 }
 
 func (m *BaseModel) BeforeCreate(tx *gorm.DB) error {
-	tx.Statement.SetColumn("ID", uuid.New().String())
+	tx.Statement.SetColumn("ID", pkgid.NewID().String())
 	return nil
 }

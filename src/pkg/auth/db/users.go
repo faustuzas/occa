@@ -8,9 +8,13 @@ type UsersDB struct {
 	db *gorm.DB
 }
 
-func (u *UsersDB) Get() (User, error) {
-	//TODO implement me
-	panic("implement me")
+func (u *UsersDB) Create(user User) error {
+	return u.db.Create(&user).Error
+}
+
+func (u *UsersDB) FindByUsername(username string) (User, error) {
+	var user User
+	return user, u.db.Find(&user, "username = ?", username).Error
 }
 
 func (u *UsersDB) Start() error {

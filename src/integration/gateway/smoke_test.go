@@ -7,7 +7,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/goleak"
 
 	"github.com/faustuzas/occa/src/gateway"
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
@@ -48,11 +47,11 @@ func TestGatewaySmoke(t *testing.T) {
 			Configuration: gateway.Configuration{
 				ServerListenAddress: listenAddr,
 
-				InMemoryDB: pkgservice.FromImplementation[pkginmemorydb.Store, pkginmemorydb.Configuration](store),
+				InMemoryDB: pkgservice.FromImpl[pkginmemorydb.Store, pkginmemorydb.Configuration](store),
 				Auth:       pkgauth.ValidatorConfiguration{Type: pkgauth.ValidatorConfigurationNoop},
 				Registerer: pkgauth.RegistererConfiguration{
-					UsersDB:     pkgservice.FromImplementation[pkgauthdb.Users, pkgauth.UsersConfiguration](usersDB),
-					TokenIssuer: pkgservice.FromImplementation[pkgauth.TokenIssuer, pkgauth.TokenIssuerConfiguration](pkgauth.NewMockTokenIssuer(ctrl)),
+					UsersDB:     pkgservice.FromImpl[pkgauthdb.Users, pkgauth.UsersConfiguration](usersDB),
+					TokenIssuer: pkgservice.FromImpl[pkgauth.TokenIssuer, pkgauth.TokenIssuerConfiguration](pkgauth.NewMockTokenIssuer(ctrl)),
 				},
 			},
 			Logger:   pkgtest.Logger,
@@ -70,5 +69,5 @@ func TestGatewaySmoke(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	pkgtest.PackageMain(m)
 }

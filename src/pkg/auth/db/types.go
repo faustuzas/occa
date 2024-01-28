@@ -8,10 +8,14 @@ import (
 
 type User struct {
 	pkgdb.BaseModel
+
+	Username string `gorm:"unique;not null"`
+	Password string `gorm:"not null"`
 }
 
 type Users interface {
-	Get() (User, error)
+	Create(u User) error
+	FindByUsername(username string) (User, error)
 
 	Start() error
 	Close() error

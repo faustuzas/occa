@@ -47,19 +47,33 @@ func (mr *MockUsersMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockUsers)(nil).Close))
 }
 
-// Get mocks base method.
-func (m *MockUsers) Get() (User, error) {
+// Create mocks base method.
+func (m *MockUsers) Create(arg0 User) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get")
+	ret := m.ctrl.Call(m, "Create", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockUsersMockRecorder) Create(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUsers)(nil).Create), arg0)
+}
+
+// FindByUsername mocks base method.
+func (m *MockUsers) FindByUsername(arg0 string) (User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByUsername", arg0)
 	ret0, _ := ret[0].(User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get.
-func (mr *MockUsersMockRecorder) Get() *gomock.Call {
+// FindByUsername indicates an expected call of FindByUsername.
+func (mr *MockUsersMockRecorder) FindByUsername(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockUsers)(nil).Get))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByUsername", reflect.TypeOf((*MockUsers)(nil).FindByUsername), arg0)
 }
 
 // Start mocks base method.

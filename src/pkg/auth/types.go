@@ -1,10 +1,14 @@
 package auth
 
+import (
+	pkgid "github.com/faustuzas/occa/src/pkg/id"
+)
+
 //go:generate sh -c "mockgen -package=auth -destination=auth_mock.go . TokenValidator,TokenIssuer,Registerer"
 
 type Principal struct {
-	ID       int    `json:"id"`
-	UserName string `json:"userName"`
+	ID       pkgid.ID `json:"id"`
+	UserName string   `json:"userName"`
 }
 
 type TokenValidator interface {

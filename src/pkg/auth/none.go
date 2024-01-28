@@ -1,8 +1,12 @@
 package auth
 
+import (
+	pkgid "github.com/faustuzas/occa/src/pkg/id"
+)
+
 var (
 	noopPrincipal = Principal{
-		ID:       123,
+		ID:       pkgid.NewID(),
 		UserName: "The_User",
 	}
 )
