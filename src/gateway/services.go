@@ -63,7 +63,7 @@ func (p Params) StartServices() (_ Services, err error) {
 
 	var sErr error
 	for _, s := range starters {
-		if e := s(); err != nil {
+		if e := s(); e != nil {
 			sErr = multierr.Append(sErr, e)
 		}
 	}
@@ -75,6 +75,7 @@ func (p Params) StartServices() (_ Services, err error) {
 		InMemoryDB:         inMemoryDB,
 		HTTPAuthMiddleware: httpAuthMiddleware,
 		AuthRegisterer:     pkgauth.NewRegisterer(usersDB, tokenIssuer),
+		closers:            closers,
 	}, nil
 }
 

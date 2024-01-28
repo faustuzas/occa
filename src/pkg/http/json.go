@@ -14,13 +14,17 @@ type JSONErrorResponse struct {
 func RespondWithJSONError(l *zap.Logger, w http.ResponseWriter, err error) {
 	httpErr := DetermineHTTPError(err)
 	w.WriteHeader(httpErr.StatusCode)
-	RespondWithJSON(l, w, JSONErrorResponse{Details: httpErr.Details})
+	writeJsonBody(l, w, JSONErrorResponse{Details: httpErr.Details})
 }
 
 // RespondWithJSON serializes the val into JSON and writes it into the response writer.
 // Expects that if any status code was required to set, it is already set for the writer.
 func RespondWithJSON(l *zap.Logger, w http.ResponseWriter, val interface{}) {
 	w.WriteHeader(http.StatusOK)
+	writeJsonBody(l, w, val)
+}
+
+func writeJsonBody(l *zap.Logger, w http.ResponseWriter, val interface{}) {
 	w.Header().Add(HeaderContentType, ContentTypeJSON)
 
 	var err error

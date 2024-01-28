@@ -45,14 +45,6 @@ type Params struct {
 func Start(p Params) error {
 	logger := p.Logger
 
-	listener, err := p.ServerListenAddress.Listener()
-	if err != nil {
-		return fmt.Errorf("unable to listen: %w", err)
-	}
-	defer func() {
-		_ = listener.Close()
-	}()
-
 	services, err := p.StartServices()
 	if err != nil {
 		return err
@@ -69,28 +61,20 @@ func Start(p Params) error {
 	}
 
 	var (
-		srv = http.Server{
-			Handler:      routes,
-			WriteTimeout: time.Second * 15,
-			ReadTimeout:  time.Second * 15,
-			IdleTimeout:  time.Second * 60,
-		}
+		srv      = pkghttp.NewServer(logger, p.ServerListenAddress, routes)
 		srvErrCh = make(chan error, 1)
 	)
 	go func() {
 		logger.Info("starting server", zap.Stringer("address", p.ServerListenAddress))
 
-		err = srv.Serve(listener)
-		if err != nil && err != http.ErrServerClosed {
-			srvErrCh <- err
-		}
+		srvErrCh <- srv.Start()
 	}()
 
 	select {
 	case <-p.CloseCh:
 		logger.Info("received close request, terminating")
 		if err = srv.Shutdown(context.Background()); err != nil {
-			return fmt.Errorf("closing server: %w", err)
+			return fmt.Errorf("shuting down server: %w", err)
 		}
 	case err = <-srvErrCh:
 		return fmt.Errorf("starting server: %w", err)

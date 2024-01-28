@@ -23,7 +23,7 @@ func NewRouterBuilder(l *zap.Logger) *RouterBuilder {
 
 	return &RouterBuilder{
 		mux:    mux.NewRouter(),
-		logger: l,
+		logger: l.WithOptions(zap.WithCaller(false), zap.AddStacktrace(zap.FatalLevel)),
 	}
 }
 
@@ -42,6 +42,7 @@ func (b *RouterBuilder) HandleJSONFunc(path string, f func(http.ResponseWriter, 
 	return b.mux.Handle(path, b.wrap(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		respObj, err := f(w, req)
 		if err != nil {
+			b.logger.Error("failed handling request", zap.Error(err), zap.String("path", req.URL.Path))
 			RespondWithJSONError(b.logger, w, err)
 			return
 		}
