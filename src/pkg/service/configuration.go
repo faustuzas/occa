@@ -28,9 +28,15 @@ func (cfg *ExternalService[S, CFG]) GetService() (S, error) {
 	return cfg.service, nil
 }
 
-func FromImplementation[S comparable, CFG ConfigurationWithConstructor[S]](impl S) *ExternalService[S, CFG] {
+func FromImpl[S comparable, CFG ConfigurationWithConstructor[S]](impl S) *ExternalService[S, CFG] {
 	return &ExternalService[S, CFG]{
 		service: impl,
+	}
+}
+
+func FromConfig[S comparable, CFG ConfigurationWithConstructor[S]](cfg CFG) *ExternalService[S, CFG] {
+	return &ExternalService[S, CFG]{
+		cfg: cfg,
 	}
 }
 

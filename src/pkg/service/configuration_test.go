@@ -33,8 +33,19 @@ func TestExternalServiceFromYAML(t *testing.T) {
 	require.Equal(t, 12, service.number)
 }
 
-func TestExternalServiceFromImplementation(t *testing.T) {
-	cfg := FromImplementation[SampleService, SampleServiceConfiguration](SampleService{number: 19})
+func TestExternalServiceFromImpl(t *testing.T) {
+	cfg := FromImpl[SampleService, SampleServiceConfiguration](SampleService{number: 19})
+
+	service, err := cfg.GetService()
+	require.NoError(t, err)
+
+	require.Equal(t, 19, service.number)
+}
+
+func TestExternalServiceFromConfig(t *testing.T) {
+	cfg := FromConfig[SampleService, SampleServiceConfiguration](SampleServiceConfiguration{
+		Num: 19,
+	})
 
 	service, err := cfg.GetService()
 	require.NoError(t, err)
