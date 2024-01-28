@@ -18,31 +18,33 @@ type registeredContainer interface {
 	Terminate(ctx context.Context) error
 }
 
-var registry struct {
+type registry struct {
 	mu sync.Mutex
 
 	containers map[string]registeredContainer
 }
+
+var r = registry{containers: map[string]registeredContainer{}}
 
 func resolve[T registeredContainer](
 	name string,
 	cleanup interface{ Cleanup(f func()) },
 	create func() (registeredContainer, error),
 ) (T, error) {
-	registry.mu.Lock()
-	defer registry.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	if _, ok := registry.containers[name]; !ok {
+	if _, ok := r.containers[name]; !ok {
 		c, err := create()
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("creating container %s: %w", name, err)
 		}
 
-		registry.containers[name] = c
+		r.containers[name] = c
 	}
 
-	c := registry.containers[name]
+	c := r.containers[name]
 	c.IncRef()
 
 	cleanup.Cleanup(func() {

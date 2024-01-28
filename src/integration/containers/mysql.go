@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -50,17 +49,13 @@ func WithMysql(t *testing.T) *MySQLContainer {
 			return nil, err
 		}
 
-		natPort, err := nat.NewPort("tcp", port)
+		mappedPort, err := resolveMappedPort(c, port)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("resolving mapped port: %w", err)
 		}
 
-		mappedPort, err := c.MappedPort(context.Background(), natPort)
-		if err != nil {
-			return nil, err
-		}
 		mysql := &MySQLContainer{
-			Container: Container{c: c, refCount: 1},
+			Container: Container{c: c},
 			Username:  username,
 			Password:  password,
 			Port:      mappedPort.Int(),
