@@ -8,11 +8,11 @@ import (
 
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
-	pkginmemorydb "github.com/faustuzas/occa/src/pkg/inmemorydb"
+	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
 )
 
 type Services struct {
-	InMemoryDB         pkginmemorydb.Store
+	InMemoryDB         pkgmemstore.Store
 	HTTPAuthMiddleware httpmiddleware.Middleware
 	AuthRegisterer     pkgauth.Registerer
 
@@ -28,7 +28,7 @@ func (p Params) StartServices() (_ Services, err error) {
 	}()
 	var starters []func() error
 
-	inMemoryDB, err := p.Configuration.InMemoryDB.GetService()
+	inMemoryDB, err := p.Configuration.MemStore.Build()
 	if err != nil {
 		return Services{}, fmt.Errorf("building redis client: %w", err)
 	}
@@ -39,7 +39,7 @@ func (p Params) StartServices() (_ Services, err error) {
 	case pkgauth.ValidatorConfigurationNoop:
 		httpAuthMiddleware = pkgauth.NoopMiddleware()
 	case pkgauth.ValidatorConfigurationJWTRSA:
-		validator, e := p.Configuration.Auth.JWTValidator.GetService()
+		validator, e := p.Configuration.Auth.JWTValidator.Build()
 		if e != nil {
 			return Services{}, fmt.Errorf("building JWT RSA validator: %w", e)
 		}
@@ -49,12 +49,12 @@ func (p Params) StartServices() (_ Services, err error) {
 		return Services{}, fmt.Errorf("auth not configured")
 	}
 
-	tokenIssuer, err := p.Registerer.TokenIssuer.GetService()
+	tokenIssuer, err := p.Registerer.TokenIssuer.Build()
 	if err != nil {
 		return Services{}, fmt.Errorf("building JWT token issuer: %w", err)
 	}
 
-	usersDB, err := p.Registerer.UsersDB.GetService()
+	usersDB, err := p.Registerer.Users.Build()
 	if err != nil {
 		return Services{}, fmt.Errorf("building auth db connection: %w", err)
 	}

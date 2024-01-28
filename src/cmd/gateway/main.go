@@ -22,7 +22,7 @@ func main() {
 		return
 	}
 
-	logger, err := config.Logger.GetService()
+	logger, err := config.Logger.Build()
 	if err != nil {
 		fmt.Printf("failed to configure logger: %v\n", err)
 		return

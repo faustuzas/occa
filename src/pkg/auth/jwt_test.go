@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	pkgid "github.com/faustuzas/occa/src/pkg/id"
 )
 
 func TestJWTRoundTrip(t *testing.T) {
@@ -15,7 +18,7 @@ func TestJWTRoundTrip(t *testing.T) {
 		privateKey, publicKey = generateRSAKeyPair(t, 4096)
 
 		principal = Principal{
-			ID:       100,
+			ID:       pkgid.NewID(),
 			UserName: "mr test",
 		}
 	)
@@ -24,11 +27,11 @@ func TestJWTRoundTrip(t *testing.T) {
 		return now
 	})
 
-	token, err := issuer.Issue(principal)
+	token, err := issuer.Issue(context.Background(), principal)
 	require.NoError(t, err)
 
 	validator := NewJWTValidator(publicKey)
-	resultPrincipal, err := validator.Validate(token)
+	resultPrincipal, err := validator.Validate(context.Background(), token)
 	require.NoError(t, err)
 
 	require.Equal(t, principal, resultPrincipal)

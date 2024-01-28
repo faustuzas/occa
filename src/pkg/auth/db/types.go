@@ -1,6 +1,8 @@
 package db
 
 import (
+	"context"
+
 	pkgdb "github.com/faustuzas/occa/src/pkg/db"
 )
 
@@ -14,8 +16,8 @@ type User struct {
 }
 
 type Users interface {
-	Create(u User) error
-	FindByUsername(username string) (User, error)
+	Create(ctx context.Context, u User) error
+	FindByUsername(ctx context.Context, username string) (User, error)
 
 	Start() error
 	Close() error

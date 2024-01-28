@@ -10,7 +10,6 @@ import (
 
 	"github.com/faustuzas/occa/src/pkg/auth/db"
 	pkgdb "github.com/faustuzas/occa/src/pkg/db"
-	pkgservice "github.com/faustuzas/occa/src/pkg/service"
 )
 
 type ValidatorConfigurationType string
@@ -21,8 +20,8 @@ const (
 )
 
 type ValidatorConfiguration struct {
-	Type         ValidatorConfigurationType                                            `yaml:"type"`
-	JWTValidator *pkgservice.ExternalService[*JWTValidator, JWTValidatorConfiguration] `yaml:"jwt"`
+	Type         ValidatorConfigurationType `yaml:"type"`
+	JWTValidator JWTValidatorConfiguration  `yaml:"jwt"`
 }
 
 type JWTValidatorConfiguration struct {
@@ -54,16 +53,16 @@ func (c JWTValidatorConfiguration) Build() (*JWTValidator, error) {
 }
 
 type RegistererConfiguration struct {
-	UsersDB     *pkgservice.ExternalService[db.Users, UsersConfiguration]          `yaml:"database"`
-	TokenIssuer *pkgservice.ExternalService[TokenIssuer, TokenIssuerConfiguration] `yaml:"jwt"`
+	Users       UsersConfiguration       `yaml:"users"`
+	TokenIssuer TokenIssuerConfiguration `yaml:"jwt"`
 }
 
 type UsersConfiguration struct {
-	pkgdb.Configuration `yaml:",inline"`
+	DB pkgdb.Configuration `yaml:"db"`
 }
 
 func (c UsersConfiguration) Build() (db.Users, error) {
-	gormDB, err := c.Configuration.Build()
+	gormDB, err := c.DB.Build()
 	if err != nil {
 		return nil, err
 	}
@@ -86,14 +85,9 @@ func (c TokenIssuerConfiguration) Build() (TokenIssuer, error) {
 		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 
-	k, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	rsaPrivKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, err
-	}
-
-	rsaPrivKey, ok := k.(*rsa.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("expected *rsa.PrivateKey, got %T", k)
 	}
 
 	return NewJWTIssuer(rsaPrivKey, time.Now), nil

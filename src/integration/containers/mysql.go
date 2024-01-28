@@ -64,8 +64,6 @@ func WithMysql(t *testing.T) *MySQLContainer {
 			return nil, err
 		}
 
-		fmt.Println("[test-container] mysql initialized and ready to use!")
-
 		return mysql, nil
 	})
 	require.NoError(t, err)
@@ -108,14 +106,14 @@ func (c *MySQLContainer) waitForHealthy() error {
 }
 
 func (c *MySQLContainer) WithTemporaryDatabase(cleanup interface{ Cleanup(func()) }, prefix string) (string, error) {
-	db, err := sql.Open("mysql", pkgdb.MysqlDNS(c.Username, c.Password, "localhost", c.Port, ""))
+	db, err := sql.Open("mysql", c.DataSourceName(""))
 	if err != nil {
 		return "", fmt.Errorf("opening database connection: %w", err)
 	}
 
-	cleanup.Cleanup(func() {
+	defer func() {
 		_ = db.Close()
-	})
+	}()
 
 	databaseName := fmt.Sprintf("%v_%d", prefix, rand.Int())
 
@@ -123,9 +121,9 @@ func (c *MySQLContainer) WithTemporaryDatabase(cleanup interface{ Cleanup(func()
 		return "", fmt.Errorf("creating database: %w", err)
 	}
 
-	cleanup.Cleanup(func() {
-		_, _ = db.Exec("DROP DATABASE " + databaseName)
-	})
-
 	return databaseName, nil
+}
+
+func (c *MySQLContainer) DataSourceName(database string) string {
+	return pkgdb.MysqlDNS(c.Username, c.Password, "localhost", c.Port, database)
 }

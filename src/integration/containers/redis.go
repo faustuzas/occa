@@ -13,7 +13,9 @@ import (
 type RedisContainer struct {
 	Container
 
-	Port int
+	Username string
+	Password string
+	Port     int
 }
 
 func WithRedis(t *testing.T) *RedisContainer {
@@ -41,7 +43,10 @@ func WithRedis(t *testing.T) *RedisContainer {
 
 		return &RedisContainer{
 			Container: Container{c: c},
-			Port:      mappedPort.Int(),
+
+			Username: "",
+			Password: "",
+			Port:     mappedPort.Int(),
 		}, nil
 	})
 	require.NoError(t, err)

@@ -26,11 +26,11 @@ func HTTPTokenAuthorizationMiddleware(l *zap.Logger, validator TokenValidator) h
 				return
 			}
 
-			if strings.HasPrefix("Bearer ", token) {
+			if strings.HasPrefix(token, "Bearer ") {
 				token = token[len("Bearer "):]
 			}
 
-			principal, err := validator.Validate(token)
+			principal, err := validator.Validate(r.Context(), token)
 			if err != nil {
 				pkghttp.RespondWithJSONError(l, w, pkgerrors.ErrUnauthorized(err))
 				return

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rsa"
 	"time"
 
@@ -38,7 +39,7 @@ type JWTValidator struct {
 	validator *jwt.Validator
 }
 
-func (v *JWTValidator) Validate(token string) (Principal, error) {
+func (v *JWTValidator) Validate(_ context.Context, token string) (Principal, error) {
 	t, err := jwt.ParseWithClaims(token, &claims{}, func(_ *jwt.Token) (interface{}, error) {
 		return v.key, nil
 	})
@@ -66,7 +67,7 @@ type JWTIssuer struct {
 	now func() time.Time
 }
 
-func (i *JWTIssuer) Issue(p Principal) (string, error) {
+func (i *JWTIssuer) Issue(_ context.Context, p Principal) (string, error) {
 	t := jwt.NewWithClaims(signingMethod, claims{
 		Principal: p,
 		RegisteredClaims: jwt.RegisteredClaims{

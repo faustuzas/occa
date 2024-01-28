@@ -17,7 +17,14 @@ func (id ID) String() string {
 }
 
 func (id ID) MarshalJSON() ([]byte, error) {
-	return []byte(id.String()), nil
+	str := []byte(id.String())
+	buff := make([]byte, len(str)+2)
+
+	buff[0] = '"'
+	copy(buff[1:len(buff)-1], str)
+	buff[len(buff)-1] = '"'
+
+	return buff, nil
 }
 
 func (id *ID) UnmarshalJSON(data []byte) error {

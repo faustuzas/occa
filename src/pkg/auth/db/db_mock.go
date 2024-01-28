@@ -5,6 +5,7 @@
 package db
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -48,32 +49,32 @@ func (mr *MockUsersMockRecorder) Close() *gomock.Call {
 }
 
 // Create mocks base method.
-func (m *MockUsers) Create(arg0 User) error {
+func (m *MockUsers) Create(arg0 context.Context, arg1 User) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", arg0)
+	ret := m.ctrl.Call(m, "Create", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockUsersMockRecorder) Create(arg0 interface{}) *gomock.Call {
+func (mr *MockUsersMockRecorder) Create(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUsers)(nil).Create), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUsers)(nil).Create), arg0, arg1)
 }
 
 // FindByUsername mocks base method.
-func (m *MockUsers) FindByUsername(arg0 string) (User, error) {
+func (m *MockUsers) FindByUsername(arg0 context.Context, arg1 string) (User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByUsername", arg0)
+	ret := m.ctrl.Call(m, "FindByUsername", arg0, arg1)
 	ret0, _ := ret[0].(User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindByUsername indicates an expected call of FindByUsername.
-func (mr *MockUsersMockRecorder) FindByUsername(arg0 interface{}) *gomock.Call {
+func (mr *MockUsersMockRecorder) FindByUsername(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByUsername", reflect.TypeOf((*MockUsers)(nil).FindByUsername), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByUsername", reflect.TypeOf((*MockUsers)(nil).FindByUsername), arg0, arg1)
 }
 
 // Start mocks base method.

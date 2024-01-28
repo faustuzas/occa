@@ -1,4 +1,4 @@
-package inmemorydb
+package memstore
 
 import (
 	"context"

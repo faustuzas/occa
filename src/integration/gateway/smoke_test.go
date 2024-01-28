@@ -4,68 +4,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/faustuzas/occa/src/gateway"
-	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
-	pkgauthdb "github.com/faustuzas/occa/src/pkg/auth/db"
+	"github.com/faustuzas/occa/src/integration/containers"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
-	pkginmemorydb "github.com/faustuzas/occa/src/pkg/inmemorydb"
-	pkgnet "github.com/faustuzas/occa/src/pkg/net"
-	pkgservice "github.com/faustuzas/occa/src/pkg/service"
 	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
 func TestGatewaySmoke(t *testing.T) {
-	var (
-		ctrl = gomock.NewController(t)
-
-		usersDB = pkgauthdb.NewMockUsers(ctrl)
-		store   = pkginmemorydb.NewMockStore(ctrl)
-	)
-
-	usersDB.EXPECT().Start().Return(nil).AnyTimes()
-	usersDB.EXPECT().Close().Return(nil).AnyTimes()
-
-	store.EXPECT().Close().Return(nil).AnyTimes()
-
-	closeCh := make(chan struct{})
-	defer func() {
-		close(closeCh)
-	}()
-
-	listenAddr := pkgnet.ListenAddrFromAddress("0.0.0.0:0")
-
-	// bound to the address so the port would be allocated now
-	_, err := listenAddr.Listener()
-	require.NoError(t, err)
-
+	params := DefaultGatewayParams(t, containers.WithMysql(t), containers.WithRedis(t))
 	go func() {
-		err := gateway.Start(gateway.Params{
-			Configuration: gateway.Configuration{
-				ServerListenAddress: listenAddr,
-
-				InMemoryDB: pkgservice.FromImpl[pkginmemorydb.Store, pkginmemorydb.Configuration](store),
-				Auth:       pkgauth.ValidatorConfiguration{Type: pkgauth.ValidatorConfigurationNoop},
-				Registerer: pkgauth.RegistererConfiguration{
-					UsersDB:     pkgservice.FromImpl[pkgauthdb.Users, pkgauth.UsersConfiguration](usersDB),
-					TokenIssuer: pkgservice.FromImpl[pkgauth.TokenIssuer, pkgauth.TokenIssuerConfiguration](pkgauth.NewMockTokenIssuer(ctrl)),
-				},
-			},
-			Logger:   pkgtest.Logger,
-			Registry: prometheus.NewRegistry(),
-			CloseCh:  closeCh,
-		})
-
-		require.NoError(t, err)
+		require.NoError(t, gateway.Start(params))
 	}()
 
-	time.Sleep(1 * time.Second)
-
-	_, body := pkgtest.HTTPGetBody(t, listenAddr.String(), "/health")
-	require.Equal(t, pkghttp.DefaultOKResponse(), string(body))
+	require.Eventually(t, func() bool {
+		_, body := pkgtest.HTTPGetBody(t, params.ServerListenAddress.String(), "/health")
+		return pkghttp.DefaultOKResponse() == string(body)
+	}, time.Second, 100*time.Millisecond)
 }
 
 func TestMain(m *testing.M) {

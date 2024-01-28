@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ const (
 	testTimeout = 1 * time.Second
 )
 
-func HTTPGetBody(t require.TestingT, addr, path string) (int, []byte) {
+func HTTPGetBody(t testing.TB, addr, path string) (int, []byte) {
 	if !strings.HasPrefix(addr, "http://") {
 		addr = "http://" + addr
 	}
@@ -30,7 +31,7 @@ func HTTPGetBody(t require.TestingT, addr, path string) (int, []byte) {
 	return resp.StatusCode, body
 }
 
-func HTTPExec(t require.TestingT, req *http.Request) (*http.Response, []byte) {
+func HTTPExec(t testing.TB, req *http.Request) (*http.Response, []byte) {
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer func() {

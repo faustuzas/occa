@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+
 	pkgid "github.com/faustuzas/occa/src/pkg/id"
 )
 
@@ -12,14 +14,14 @@ type Principal struct {
 }
 
 type TokenValidator interface {
-	Validate(token string) (Principal, error)
+	Validate(ctx context.Context, token string) (Principal, error)
 }
 
 type TokenIssuer interface {
-	Issue(principal Principal) (string, error)
+	Issue(ctx context.Context, principal Principal) (string, error)
 }
 
 type Registerer interface {
-	Login(username, password string) (string, error)
-	Register(username, password string) error
+	Login(ctx context.Context, username, password string) (string, error)
+	Register(ctx context.Context, username, password string) error
 }

@@ -5,6 +5,7 @@
 package auth
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -34,18 +35,18 @@ func (m *MockTokenValidator) EXPECT() *MockTokenValidatorMockRecorder {
 }
 
 // Validate mocks base method.
-func (m *MockTokenValidator) Validate(arg0 string) (Principal, error) {
+func (m *MockTokenValidator) Validate(arg0 context.Context, arg1 string) (Principal, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Validate", arg0)
+	ret := m.ctrl.Call(m, "Validate", arg0, arg1)
 	ret0, _ := ret[0].(Principal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Validate indicates an expected call of Validate.
-func (mr *MockTokenValidatorMockRecorder) Validate(arg0 interface{}) *gomock.Call {
+func (mr *MockTokenValidatorMockRecorder) Validate(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Validate", reflect.TypeOf((*MockTokenValidator)(nil).Validate), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Validate", reflect.TypeOf((*MockTokenValidator)(nil).Validate), arg0, arg1)
 }
 
 // MockTokenIssuer is a mock of TokenIssuer interface.
@@ -72,18 +73,18 @@ func (m *MockTokenIssuer) EXPECT() *MockTokenIssuerMockRecorder {
 }
 
 // Issue mocks base method.
-func (m *MockTokenIssuer) Issue(arg0 Principal) (string, error) {
+func (m *MockTokenIssuer) Issue(arg0 context.Context, arg1 Principal) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Issue", arg0)
+	ret := m.ctrl.Call(m, "Issue", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Issue indicates an expected call of Issue.
-func (mr *MockTokenIssuerMockRecorder) Issue(arg0 interface{}) *gomock.Call {
+func (mr *MockTokenIssuerMockRecorder) Issue(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Issue", reflect.TypeOf((*MockTokenIssuer)(nil).Issue), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Issue", reflect.TypeOf((*MockTokenIssuer)(nil).Issue), arg0, arg1)
 }
 
 // MockRegisterer is a mock of Registerer interface.
@@ -110,30 +111,30 @@ func (m *MockRegisterer) EXPECT() *MockRegistererMockRecorder {
 }
 
 // Login mocks base method.
-func (m *MockRegisterer) Login(arg0, arg1 string) (string, error) {
+func (m *MockRegisterer) Login(arg0 context.Context, arg1, arg2 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Login", arg0, arg1)
+	ret := m.ctrl.Call(m, "Login", arg0, arg1, arg2)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Login indicates an expected call of Login.
-func (mr *MockRegistererMockRecorder) Login(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRegistererMockRecorder) Login(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockRegisterer)(nil).Login), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockRegisterer)(nil).Login), arg0, arg1, arg2)
 }
 
 // Register mocks base method.
-func (m *MockRegisterer) Register(arg0, arg1 string) error {
+func (m *MockRegisterer) Register(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Register", arg0, arg1)
+	ret := m.ctrl.Call(m, "Register", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockRegistererMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRegistererMockRecorder) Register(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockRegisterer)(nil).Register), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockRegisterer)(nil).Register), arg0, arg1, arg2)
 }

@@ -16,9 +16,8 @@ import (
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
-	pkginmemorydb "github.com/faustuzas/occa/src/pkg/inmemorydb"
+	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
-	pkgservice "github.com/faustuzas/occa/src/pkg/service"
 )
 
 type Configuration struct {
@@ -26,9 +25,9 @@ type Configuration struct {
 
 	ServerListenAddress *pkgnet.ListenAddr `yaml:"listenAddress"`
 
-	InMemoryDB *pkgservice.ExternalService[pkginmemorydb.Store, pkginmemorydb.Configuration] `yaml:"inMemoryDB"`
-	Auth       pkgauth.ValidatorConfiguration                                                `yaml:"auth"`
-	Registerer pkgauth.RegistererConfiguration                                               `yaml:"registerer"`
+	MemStore   pkgmemstore.Configuration       `yaml:"memstore"`
+	Auth       pkgauth.ValidatorConfiguration  `yaml:"auth"`
+	Registerer pkgauth.RegistererConfiguration `yaml:"registerer"`
 }
 
 type Params struct {
@@ -101,12 +100,12 @@ func configureRoutes(p Params, services Services) (http.Handler, error) {
 			return nil, err
 		}
 
-		err := services.AuthRegisterer.Register(req.Username, req.Password)
+		err := services.AuthRegisterer.Register(r.Context(), req.Username, req.Password)
 		if err != nil {
 			return nil, err
 		}
 
-		return pkghttp.DefaultOKResponse(), nil
+		return gatewayclient.RegistrationResponse{}, nil
 	}).Methods(http.MethodPost)
 
 	instrumentedRouter.HandleJSONFunc("/login", func(w http.ResponseWriter, r *http.Request) (any, error) {
@@ -115,7 +114,7 @@ func configureRoutes(p Params, services Services) (http.Handler, error) {
 			return nil, err
 		}
 
-		token, err := services.AuthRegisterer.Login(req.Username, req.Password)
+		token, err := services.AuthRegisterer.Login(r.Context(), req.Username, req.Password)
 		if err != nil {
 			return nil, err
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
+	pkgid "github.com/faustuzas/occa/src/pkg/id"
 	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
@@ -35,11 +36,11 @@ func TestHTTPMiddleware_Success(t *testing.T) {
 		ctrl          = gomock.NewController(t)
 		validatorMock = NewMockTokenValidator(ctrl)
 
-		token     = "Bearer token"
-		principal = Principal{ID: 10, UserName: "mr. test"}
+		token     = "a token"
+		principal = Principal{ID: pkgid.NewID(), UserName: "mr. test"}
 	)
 
-	validatorMock.EXPECT().Validate(token).Return(principal, nil)
+	validatorMock.EXPECT().Validate(gomock.Any(), token).Return(principal, nil)
 	authMiddleware := HTTPTokenAuthorizationMiddleware(pkgtest.Logger, validatorMock)
 
 	var actualPrincipal Principal
@@ -51,7 +52,7 @@ func TestHTTPMiddleware_Success(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
 	require.NoError(t, err)
 
-	req.Header.Set("Authorization", token)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, _ := pkgtest.HTTPExec(t, req)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
