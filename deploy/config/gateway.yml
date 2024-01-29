@@ -4,7 +4,7 @@ logger:
 
 listenAddress: 0.0.0.0:9000
 
-inMemoryDB:
+memstore:
   address: localhost:6379
 
 auth:
@@ -15,10 +15,11 @@ auth:
 registerer:
   jwt:
     privateKeyPath: ./tmp/keys/occa
-  database:
-    dbType: mysql
-    host: localhost
-    port: 3306
-    database: auth
-    username: root
-    password: root
+  users:
+    db:
+      dbType: mysql
+      host: localhost
+      port: 3306
+      database: auth
+      username: root
+      password: root
