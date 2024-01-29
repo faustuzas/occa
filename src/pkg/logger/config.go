@@ -1,4 +1,4 @@
-package config
+package logger
 
 import (
 	"fmt"
@@ -7,13 +7,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type LoggerConfiguration struct {
+type Configuration struct {
 	Level           string `yaml:"level"`
 	Component       string `yaml:"component"`
 	DevelopmentMode bool   `yaml:"developmentMode"`
 }
 
-func (c LoggerConfiguration) Build() (*zap.Logger, error) {
+func (c Configuration) Build() (*zap.Logger, error) {
 	config := zap.NewProductionConfig()
 	if c.DevelopmentMode {
 		config = zap.NewDevelopmentConfig()
