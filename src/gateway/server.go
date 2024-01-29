@@ -59,8 +59,13 @@ func Start(p Params) error {
 		return fmt.Errorf("configuring routes: %v", err)
 	}
 
+	serverListener, err := p.ServerListenAddress.Listener()
+	if err != nil {
+		return fmt.Errorf("binding to address: %w", err)
+	}
+
 	var (
-		srv      = pkghttp.NewServer(logger, p.ServerListenAddress, routes)
+		srv      = pkghttp.NewServer(logger, serverListener, routes)
 		srvErrCh = make(chan error, 1)
 	)
 	go func() {

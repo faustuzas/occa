@@ -85,9 +85,14 @@ func (c TokenIssuerConfiguration) Build() (TokenIssuer, error) {
 		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 
-	rsaPrivKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	privKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parsing private key: %w", err)
+	}
+
+	rsaPrivKey, ok := privKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("could not cast %T to *rsa.PrivateKey", privKey)
 	}
 
 	return NewJWTIssuer(rsaPrivKey, time.Now), nil

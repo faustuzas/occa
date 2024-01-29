@@ -10,6 +10,7 @@ import (
 	"path"
 )
 
+// TODO: opa
 func GetRSAPairPaths() (public string, private string, err error) {
 	var (
 		dirPath = path.Join(os.TempDir(), "occa_keys")
@@ -37,7 +38,11 @@ func GetRSAPairPaths() (public string, private string, err error) {
 		return "", "", fmt.Errorf("generating key: %w", err)
 	}
 
-	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", "", fmt.Errorf("marshalling private key bytes: %w", err)
+	}
+
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: privateKeyBytes,

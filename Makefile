@@ -7,7 +7,7 @@ gen-mocks:
 
 generate-rsa-key-pair:
 	mkdir -p $(TMP_DIR)/keys
-	openssl genpkey -algorithm RSA -out $(TMP_DIR)/keys/occa &> /dev/null
+	openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out $(TMP_DIR)/keys/occa &> /dev/null
 	openssl rsa -pubout -in $(TMP_DIR)/keys/occa -out $(TMP_DIR)/keys/occa_pub &> /dev/null
 
 setup-env: clean-env
