@@ -4,21 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/faustuzas/occa/src/gateway"
 	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
 	"github.com/faustuzas/occa/src/integration/containers"
-	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
-	pkgdb "github.com/faustuzas/occa/src/pkg/db"
-	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
-	pkgnet "github.com/faustuzas/occa/src/pkg/net"
+	"github.com/faustuzas/occa/src/integration/serviceboot"
 	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
@@ -26,7 +21,7 @@ func TestAuthFlowE2E(t *testing.T) {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	defer cancelFn()
 
-	gatewayParams := DefaultGatewayParams(t, containers.WithMysql(t), containers.WithRedis(t))
+	gatewayParams := serviceboot.DefaultGatewayParams(t, containers.WithMysql(t), containers.WithRedis(t))
 	go func() {
 		require.NoError(t, gateway.Start(gatewayParams))
 	}()
@@ -89,59 +84,4 @@ func toBody(t *testing.T, val any) io.Reader {
 	b, err := json.Marshal(val)
 	require.NoError(t, err)
 	return bytes.NewBuffer(b)
-}
-
-func DefaultGatewayParams(t *testing.T, db *containers.MySQLContainer, redis *containers.RedisContainer) gateway.Params {
-	listenAddr := pkgnet.ListenAddrFromAddress("0.0.0.0:0")
-	listener, err := listenAddr.Listener()
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = listener.Close()
-	})
-
-	closeCh := make(chan struct{})
-	t.Cleanup(func() {
-		close(closeCh)
-	})
-
-	authDatabase, err := db.WithTemporaryDatabase(t, "auth_users")
-	require.NoError(t, err)
-
-	pubKey, privKey, err := pkgtest.GetRSAPairPaths()
-	require.NoError(t, err)
-
-	return gateway.Params{
-		Configuration: gateway.Configuration{
-			ServerListenAddress: listenAddr,
-
-			MemStore: pkgmemstore.Configuration{
-				User:     redis.Username,
-				Password: redis.Password,
-				Address:  fmt.Sprintf("localhost:%d", redis.Port),
-			},
-
-			Auth: pkgauth.ValidatorConfiguration{
-				Type: pkgauth.ValidatorConfigurationJWTRSA,
-				JWTValidator: pkgauth.JWTValidatorConfiguration{
-					PublicKeyPath: pubKey,
-				},
-			},
-
-			Registerer: pkgauth.RegistererConfiguration{
-				TokenIssuer: pkgauth.TokenIssuerConfiguration{
-					PrivateKeyPath: privKey,
-				},
-				Users: pkgauth.UsersConfiguration{
-					DB: pkgdb.Configuration{
-						DBType:         "mysql",
-						DataSourceName: db.DataSourceName(authDatabase),
-					},
-				},
-			},
-		},
-		Logger:   pkgtest.Logger,
-		Registry: prometheus.NewRegistry(),
-		CloseCh:  closeCh,
-	}
 }
