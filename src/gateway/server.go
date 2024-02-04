@@ -2,20 +2,15 @@ package gateway
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-	gatewayclient "github.com/faustuzas/occa/src/gateway/client"
+	"github.com/faustuzas/occa/src/gateway/http"
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
-	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
 	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
 )
@@ -33,8 +28,7 @@ type Configuration struct {
 type Params struct {
 	Configuration
 
-	Logger   *zap.Logger
-	Registry *prometheus.Registry
+	Logger *zap.Logger
 
 	CloseCh <-chan struct{}
 }
@@ -42,7 +36,10 @@ type Params struct {
 // Start starts gateway server and blocks until close request is received.
 // Returns error in case initialisation failed.
 func Start(p Params) error {
-	logger := p.Logger
+	var (
+		logger   = p.Logger
+		registry = prometheus.NewRegistry()
+	)
 
 	services, err := p.StartServices()
 	if err != nil {
@@ -54,7 +51,13 @@ func Start(p Params) error {
 		}
 	}()
 
-	routes, err := configureRoutes(p, services)
+	routes, err := http.Configure(http.Services{
+		UsersRegisterer:    services.AuthRegisterer,
+		AuthMiddleware:     services.HTTPAuthMiddleware,
+		ActiveUsersTracker: services.ActiveUserTracker,
+		Logger:             p.Logger,
+		Registry:           registry,
+	})
 	if err != nil {
 		return fmt.Errorf("configuring routes: %v", err)
 	}
@@ -85,77 +88,4 @@ func Start(p Params) error {
 	}
 
 	return nil
-}
-
-func configureRoutes(p Params, services Services) (http.Handler, error) {
-	rawRouter := pkghttp.NewRouterBuilder(p.Logger)
-	rawRouter.HandleFunc("/metrics", promhttp.HandlerFor(p.Registry, promhttp.HandlerOpts{}).ServeHTTP).
-		Methods(http.MethodGet)
-
-	instrumentedRouter := rawRouter.SubGroup().
-		With(httpmiddleware.BasicMetrics(p.Registry), httpmiddleware.RequestLogger(p.Logger))
-
-	instrumentedRouter.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		return pkghttp.DefaultOKResponse(), nil
-	}).Methods(http.MethodGet)
-
-	instrumentedRouter.HandleJSONFunc("/register", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		var req gatewayclient.RegistrationRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			return nil, err
-		}
-
-		err := services.AuthRegisterer.Register(r.Context(), req.Username, req.Password)
-		if err != nil {
-			return nil, err
-		}
-
-		return gatewayclient.RegistrationResponse{}, nil
-	}).Methods(http.MethodPost)
-
-	instrumentedRouter.HandleJSONFunc("/login", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		var req gatewayclient.LoginRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			return nil, err
-		}
-
-		token, err := services.AuthRegisterer.Login(r.Context(), req.Username, req.Password)
-		if err != nil {
-			return nil, err
-		}
-
-		return gatewayclient.LoginResponse{
-			Token: token,
-		}, nil
-	}).Methods(http.MethodPost)
-
-	authenticatedRouter := instrumentedRouter.SubGroup().
-		With(services.HTTPAuthMiddleware)
-
-	authenticatedRouter.HandleJSONFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		principal := pkgauth.PrincipalFromContext(r.Context())
-
-		if err := services.InMemoryDB.SetCollectionItemWithTTL(
-			r.Context(), "active_users",
-			principal.UserName,
-			"",
-			30*time.Second,
-		); err != nil {
-			return nil, fmt.Errorf("writing into redis: %w", err)
-		}
-		return pkghttp.DefaultOKResponse(), nil
-	}).Methods(http.MethodPost)
-
-	authenticatedRouter.HandleJSONFunc("/active-users", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		activeUsers, err := services.InMemoryDB.ListCollectionKeys(r.Context(), "active_users")
-		if err != nil {
-			return nil, fmt.Errorf("was not to read from redis: %w", err)
-		}
-
-		return gatewayclient.ActiveUsersResponse{
-			ActiveUsers: activeUsers,
-		}, nil
-	}).Methods(http.MethodGet)
-
-	return rawRouter.Build(), nil
 }

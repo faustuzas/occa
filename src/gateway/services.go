@@ -6,33 +6,38 @@ import (
 
 	multierr "github.com/hashicorp/go-multierror"
 
+	"github.com/faustuzas/occa/src/gateway/services"
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
+	pkgclock "github.com/faustuzas/occa/src/pkg/clock"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
-	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
 )
 
 type Services struct {
-	InMemoryDB         pkgmemstore.Store
 	HTTPAuthMiddleware httpmiddleware.Middleware
 	AuthRegisterer     pkgauth.Registerer
+	ActiveUserTracker  services.ActiveUsersTracker
 
 	closers []io.Closer
 }
 
 func (p Params) StartServices() (_ Services, err error) {
-	var closers []io.Closer
+	var (
+		starters []func() error
+		closers  []io.Closer
+
+		clock = pkgclock.RealClock{}
+	)
 	defer func() {
 		if err != nil {
 			err = multierr.Append(err, Services{closers: closers}.Close())
 		}
 	}()
-	var starters []func() error
 
-	inMemoryDB, err := p.Configuration.MemStore.Build()
+	memStore, err := p.Configuration.MemStore.Build()
 	if err != nil {
 		return Services{}, fmt.Errorf("building redis client: %w", err)
 	}
-	closers = append(closers, inMemoryDB)
+	closers = append(closers, memStore)
 
 	var httpAuthMiddleware httpmiddleware.Middleware
 	switch p.Configuration.Auth.Type {
@@ -61,6 +66,11 @@ func (p Params) StartServices() (_ Services, err error) {
 	starters = append(starters, usersDB.Start)
 	closers = append(closers, usersDB)
 
+	activeUsersTracker, err := services.NewActiveUsersTracker(memStore, clock)
+	if err != nil {
+		return Services{}, fmt.Errorf("building active users tracker: %w", err)
+	}
+
 	var sErr error
 	for _, s := range starters {
 		if e := s(); e != nil {
@@ -72,7 +82,7 @@ func (p Params) StartServices() (_ Services, err error) {
 	}
 
 	return Services{
-		InMemoryDB:         inMemoryDB,
+		ActiveUserTracker:  activeUsersTracker,
 		HTTPAuthMiddleware: httpAuthMiddleware,
 		AuthRegisterer:     pkgauth.NewRegisterer(usersDB, tokenIssuer),
 		closers:            closers,

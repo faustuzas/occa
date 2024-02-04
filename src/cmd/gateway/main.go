@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/faustuzas/occa/src/gateway"
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
 	pkglaunch "github.com/faustuzas/occa/src/pkg/launch"
@@ -32,7 +30,6 @@ func main() {
 		return gateway.Start(gateway.Params{
 			Configuration: config,
 			Logger:        logger,
-			Registry:      prometheus.NewRegistry(),
 			CloseCh:       closeCh,
 		})
 	})

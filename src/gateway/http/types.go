@@ -1,4 +1,8 @@
-package client
+package http
+
+import (
+	"github.com/faustuzas/occa/src/gateway/services"
+)
 
 type RegistrationRequest struct {
 	Username string `json:"username"`
@@ -20,5 +24,5 @@ type LoginResponse struct {
 }
 
 type ActiveUsersResponse struct {
-	ActiveUsers []string `json:"activeUsers"`
+	ActiveUsers []services.ActiveUser `json:"activeUsers"`
 }

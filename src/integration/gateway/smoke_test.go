@@ -13,7 +13,7 @@ import (
 	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
-func TestGatewaySmoke(t *testing.T) {
+func TestGateway_Smoke(t *testing.T) {
 	params := serviceboot.DefaultGatewayParams(t, containers.WithMysql(t), containers.WithRedis(t))
 	go func() {
 		require.NoError(t, gateway.Start(params))

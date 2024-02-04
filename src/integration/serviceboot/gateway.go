@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/faustuzas/occa/src/gateway"
 	"github.com/faustuzas/occa/src/integration/containers"
@@ -65,8 +65,7 @@ func DefaultGatewayParams(t *testing.T, db *containers.MySQLContainer, redis *co
 				},
 			},
 		},
-		Logger:   pkgtest.Logger,
-		Registry: prometheus.NewRegistry(),
-		CloseCh:  closeCh,
+		Logger:  pkgtest.Logger.With(zap.String("component", "gateway")),
+		CloseCh: closeCh,
 	}
 }

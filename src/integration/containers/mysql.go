@@ -4,16 +4,29 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	pkgdb "github.com/faustuzas/occa/src/pkg/db"
 )
+
+type mysqlLogger struct {
+	enableLogging atomic.Bool
+}
+
+func (m *mysqlLogger) Print(v ...interface{}) {
+	if m.enableLogging.Load() {
+		log.Println(v...)
+	}
+}
 
 type MySQLContainer struct {
 	Container
@@ -26,6 +39,12 @@ type MySQLContainer struct {
 // WithMysql creates a docker MySQL container if it does not yet exist and returns an interface to interact with it.
 func WithMysql(t *testing.T) *MySQLContainer {
 	c, err := resolve[*MySQLContainer]("mysql", t, func() (registeredContainer, error) {
+		// mysql driver is very noise regarding logs when booting up and checking for health
+		logger := &mysqlLogger{}
+		defer logger.enableLogging.Store(true)
+
+		require.NoError(t, mysqldriver.SetLogger(logger))
+
 		const (
 			username = "root"
 			password = "root"
