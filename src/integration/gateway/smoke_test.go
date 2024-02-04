@@ -20,7 +20,7 @@ func TestGateway_Smoke(t *testing.T) {
 	}()
 
 	require.Eventually(t, func() bool {
-		_, body := pkgtest.HTTPGetBody(t, params.ServerListenAddress.String(), "/health")
+		_, body := pkgtest.HTTPGetBody(t, params.HTTPListenAddress.String(), "/health")
 		return pkghttp.DefaultOKResponse() == string(body)
 	}, time.Second, 100*time.Millisecond)
 }

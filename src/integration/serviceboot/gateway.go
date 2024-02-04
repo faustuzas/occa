@@ -38,7 +38,7 @@ func DefaultGatewayParams(t *testing.T, db *containers.MySQLContainer, redis *co
 
 	return gateway.Params{
 		Configuration: gateway.Configuration{
-			ServerListenAddress: listenAddr,
+			HTTPListenAddress: listenAddr,
 
 			MemStore: pkgmemstore.Configuration{
 				User:     redis.Username,

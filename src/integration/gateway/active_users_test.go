@@ -26,7 +26,7 @@ func TestGateway_ActiveUsers(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	user1G := newGatewayTester(t, ctx, gatewayParams.ServerListenAddress.String())
+	user1G := newGatewayTester(t, ctx, gatewayParams.HTTPListenAddress.String())
 	user1G.register("user_1", "password")
 	user1G.login("user_1", "password")
 

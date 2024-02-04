@@ -18,7 +18,7 @@ import (
 type Configuration struct {
 	pkgconfig.CommonConfiguration `yaml:",inline"`
 
-	ServerListenAddress *pkgnet.ListenAddr `yaml:"listenAddress"`
+	HTTPListenAddress *pkgnet.ListenAddr `yaml:"listenAddress"`
 
 	MemStore   pkgmemstore.Configuration       `yaml:"memstore"`
 	Auth       pkgauth.ValidatorConfiguration  `yaml:"auth"`
@@ -62,17 +62,17 @@ func Start(p Params) error {
 		return fmt.Errorf("configuring routes: %v", err)
 	}
 
-	serverListener, err := p.ServerListenAddress.Listener()
+	httpListener, err := p.HTTPListenAddress.Listener()
 	if err != nil {
 		return fmt.Errorf("binding to address: %w", err)
 	}
 
 	var (
-		srv      = pkghttp.NewServer(logger, serverListener, routes)
+		srv      = pkghttp.NewServer(logger, httpListener, routes)
 		srvErrCh = make(chan error, 1)
 	)
 	go func() {
-		logger.Info("starting server", zap.Stringer("address", p.ServerListenAddress))
+		logger.Info("starting server", zap.Stringer("address", p.HTTPListenAddress))
 
 		srvErrCh <- srv.Start()
 	}()

@@ -28,7 +28,7 @@ func TestGateway_AuthFlow(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	gTester := gatewayTester{t: t, ctx: ctx, address: gatewayParams.ServerListenAddress.String()}
+	gTester := gatewayTester{t: t, ctx: ctx, address: gatewayParams.HTTPListenAddress.String()}
 
 	// Perform authorized call and fail.
 	req := gTester.createReq(http.MethodPost, "/heartbeat", nil)
