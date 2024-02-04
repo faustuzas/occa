@@ -10,7 +10,6 @@ import (
 	"path"
 )
 
-// TODO: opa
 func GetRSAPairPaths() (public string, private string, err error) {
 	var (
 		dirPath = path.Join(os.TempDir(), "occa_keys")
@@ -18,10 +17,6 @@ func GetRSAPairPaths() (public string, private string, err error) {
 		publicPath  = path.Join(dirPath, "key_pub")
 		privatePath = path.Join(dirPath, "key")
 	)
-
-	if _, err = os.Stat(dirPath); err == nil {
-		return publicPath, privatePath, nil
-	}
 
 	if err = os.MkdirAll(dirPath, os.ModePerm); err != nil {
 		return "", "", fmt.Errorf("creating key directory: %w", err)
