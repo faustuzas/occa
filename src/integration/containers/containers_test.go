@@ -14,6 +14,10 @@ func TestRedis(t *testing.T) {
 	WithRedis(t)
 }
 
+func TestEtcd(t *testing.T) {
+	WithEtcd(t)
+}
+
 func TestMain(m *testing.M) {
 	pkgtest.PackageMain(m)
 }

@@ -29,7 +29,27 @@ services:
       MYSQL_ROOT_PASSWORD: root
     volumes:
       - mysql:/var/lib/mysq
+  etcd:
+    image: quay.io/coreos/etcd:v3.4.15
+    command:
+      - etcd
+      - --data-dir
+      - /data.etcd
+      - --name
+      - occa-1
+      - --advertise-client-urls
+      - http://0.0.0.0:2379
+      - --listen-client-urls
+      - http://0.0.0.0:2379
+      - --listen-peer-urls
+      - http://0.0.0.0:2380
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd:/data.etcd
 volumes:
   prom:
   grafana:
   mysql:
+  etcd:
