@@ -7,18 +7,13 @@ Used to interact with system.
 
 ### Gateway
 HTTP frontdoor to the backend system:
+- authenticates users.
 - resolves which chat server client should connect to.
 - provides online members functionality and allows to start a chat with one.
+- resolves the event server where the recipient is connected to and forwards the message
 
-### Auth server
-Central place of authentication of the system:
-- Allows to authenticate via username/password and returns a JWT token.
-- Valides whether authentication header is valid.
-
-
-### Chat server
-Stateful distributed component which distributes active users via consistent hashing and keeps
-a connection with the client. Forward messages to the correct receiver.
+### Event server
+Keeps a persistent connection to a client for relaying real time events to user.
 
 ### Archiver
-Collect messages sent between client and stores them into durable storage. Allows to view older messages with friends.
+Collect messages sent between client and stores them into durable storage. Allows to view chat history.
