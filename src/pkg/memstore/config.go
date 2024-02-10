@@ -12,6 +12,8 @@ type Configuration struct {
 	Address  string `yaml:"address"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
+
+	Prefix string `yaml:"prefix"`
 }
 
 func (c Configuration) Build() (Store, error) {
@@ -28,5 +30,5 @@ func (c Configuration) Build() (Store, error) {
 		return RedisClient{}, fmt.Errorf("connecting to redis: %w", err)
 	}
 
-	return RedisClient{c: redisClient}, nil
+	return NewRedisClient(redisClient, c.Prefix), nil
 }

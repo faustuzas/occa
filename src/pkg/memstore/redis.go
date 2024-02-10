@@ -10,12 +10,24 @@ import (
 	pkgslices "github.com/faustuzas/occa/src/pkg/slices"
 )
 
+const (
+	separator = ":"
+)
+
 type RedisClient struct {
-	c *redis.Client
+	c      *redis.Client
+	prefix string
+}
+
+func NewRedisClient(c *redis.Client, prefix string) RedisClient {
+	return RedisClient{
+		c:      c,
+		prefix: prefix + separator,
+	}
 }
 
 func (c RedisClient) GetCollectionItem(ctx context.Context, collection string, key string) ([]byte, error) {
-	strResult, err := c.c.Get(ctx, collectionKey(collection, key)).Result()
+	strResult, err := c.c.Get(ctx, c.collectionKey(collection, key)).Result()
 	if err != nil {
 		return nil, fmt.Errorf("getting item: %w", err)
 	}
@@ -24,11 +36,11 @@ func (c RedisClient) GetCollectionItem(ctx context.Context, collection string, k
 }
 
 func (c RedisClient) SetCollectionItemWithTTL(ctx context.Context, collection string, key string, value []byte, ttl time.Duration) error {
-	return c.c.Set(ctx, collectionKey(collection, key), value, ttl).Err()
+	return c.c.Set(ctx, c.collectionKey(collection, key), value, ttl).Err()
 }
 
 func (c RedisClient) ListCollectionKeys(ctx context.Context, collection string) ([]string, error) {
-	strResult, err := c.c.Keys(ctx, collectionKey(collection, "*")).Result()
+	strResult, err := c.c.Keys(ctx, c.collectionKey(collection, "*")).Result()
 	if err != nil {
 		return nil, fmt.Errorf("listing keys: %w", err)
 	}
@@ -42,7 +54,7 @@ func (c RedisClient) ListCollectionKeys(ctx context.Context, collection string) 
 }
 
 func (c RedisClient) listCollectionKeys(ctx context.Context, collection string) ([]string, error) {
-	strResult, err := c.c.Keys(ctx, collectionKey(collection, "*")).Result()
+	strResult, err := c.c.Keys(ctx, c.collectionKey(collection, "*")).Result()
 	if err != nil {
 		return nil, fmt.Errorf("listing keys: %w", err)
 	}
@@ -78,6 +90,6 @@ func (c RedisClient) Close() error {
 	return c.c.Close()
 }
 
-func collectionKey(collection, key string) string {
-	return collection + ":" + key
+func (c RedisClient) collectionKey(collection, key string) string {
+	return c.prefix + collection + separator + key
 }
