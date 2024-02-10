@@ -3,7 +3,10 @@ TMP_DIR=./tmp
 CONFIG_DIR=./deploy/config
 
 gen-mocks:
-	go generate 
+	go generate
+
+gen-proto:
+	protoc --go_out=. --go-grpc_out=. src/eventserver/generated/proto/eventserverpb/*.proto
 
 generate-rsa-key-pair:
 	mkdir -p $(TMP_DIR)/keys
