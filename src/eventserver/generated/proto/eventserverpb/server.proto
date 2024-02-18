@@ -1,25 +1,15 @@
 syntax = "proto3";
 
-package chatserver;
+package eventserverpb;
 
 option go_package = "src/eventserver/generated/proto/eventserverpb";
 
+import "src/pkg/generated/proto/rteventspb/real_time_events.proto";
+
 service EventServer {
-  rpc Connect (ConnectRequest) returns (stream Event) {}
+  rpc Connect (ConnectRequest) returns (stream rteventspb.Event) {}
 }
 
 message ConnectRequest {
   string user_id = 1;
-}
-
-
-message DirectMessage {
-  string sender_id = 1;
-  string message = 2;
-}
-
-message Event {
-  oneof payload {
-    DirectMessage direct_message = 1;
-  }
 }

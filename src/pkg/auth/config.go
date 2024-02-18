@@ -10,6 +10,8 @@ import (
 
 	"github.com/faustuzas/occa/src/pkg/auth/db"
 	pkgdb "github.com/faustuzas/occa/src/pkg/db"
+	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
+	pkginstrument "github.com/faustuzas/occa/src/pkg/instrument"
 )
 
 type ValidatorConfigurationType string
@@ -22,6 +24,22 @@ const (
 type ValidatorConfiguration struct {
 	Type         ValidatorConfigurationType `yaml:"type"`
 	JWTValidator JWTValidatorConfiguration  `yaml:"jwt"`
+}
+
+func (c ValidatorConfiguration) BuildHTTPMiddleware(inst pkginstrument.Instrumentation) (httpmiddleware.Middleware, error) {
+	switch c.Type {
+	case ValidatorConfigurationNoop:
+		return NoopMiddleware(), nil
+	case ValidatorConfigurationJWTRSA:
+		validator, err := c.JWTValidator.Build()
+		if err != nil {
+			return nil, fmt.Errorf("building JWT RSA validator: %w", err)
+		}
+
+		return HTTPTokenAuthorizationMiddleware(inst, validator), nil
+	default:
+		return nil, fmt.Errorf("auth not configured")
+	}
 }
 
 type JWTValidatorConfiguration struct {

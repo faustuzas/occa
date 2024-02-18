@@ -6,23 +6,22 @@ import (
 	"net/http"
 	"strings"
 
-	"go.uber.org/zap"
-
 	pkgerrors "github.com/faustuzas/occa/src/pkg/errors"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
+	pkginstrument "github.com/faustuzas/occa/src/pkg/instrument"
 )
 
 type principalKey int
 
 var key principalKey
 
-func HTTPTokenAuthorizationMiddleware(l *zap.Logger, validator TokenValidator) httpmiddleware.Middleware {
+func HTTPTokenAuthorizationMiddleware(i pkginstrument.Instrumentation, validator TokenValidator) httpmiddleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")
 			if token == "" {
-				pkghttp.RespondWithJSONError(l, w, pkgerrors.ErrUnauthorized(fmt.Errorf("missing Authorization header")))
+				pkghttp.RespondWithJSONError(i.Logger, w, pkgerrors.ErrUnauthorized(fmt.Errorf("missing Authorization header")))
 				return
 			}
 
@@ -32,7 +31,7 @@ func HTTPTokenAuthorizationMiddleware(l *zap.Logger, validator TokenValidator) h
 
 			principal, err := validator.Validate(r.Context(), token)
 			if err != nil {
-				pkghttp.RespondWithJSONError(l, w, pkgerrors.ErrUnauthorized(err))
+				pkghttp.RespondWithJSONError(i.Logger, w, pkgerrors.ErrUnauthorized(err))
 				return
 			}
 

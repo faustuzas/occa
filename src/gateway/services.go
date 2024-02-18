@@ -1,35 +1,52 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
-	"io"
 
 	multierr "github.com/hashicorp/go-multierror"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/faustuzas/occa/src/gateway/services"
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	pkgclock "github.com/faustuzas/occa/src/pkg/clock"
+	esclient "github.com/faustuzas/occa/src/pkg/eventserver/client"
+	esmembership "github.com/faustuzas/occa/src/pkg/eventserver/membership"
+	"github.com/faustuzas/occa/src/pkg/eventserver/rtconn"
 	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
+	pkginstrument "github.com/faustuzas/occa/src/pkg/instrument"
+	pkgio "github.com/faustuzas/occa/src/pkg/io"
 )
 
 type Services struct {
-	HTTPAuthMiddleware httpmiddleware.Middleware
-	AuthRegisterer     pkgauth.Registerer
-	ActiveUserTracker  services.ActiveUsersTracker
+	pkgio.Closers
 
-	closers []io.Closer
+	HTTPAuthMiddleware  httpmiddleware.Middleware
+	AuthRegisterer      pkgauth.Registerer
+	ActiveUserTracker   services.ActiveUsersTracker
+	RTEventsRelay       services.RealTimeEventRelay
+	EventServerRegistry *esmembership.ServerRegistry
+
+	MetricsRegistry *prometheus.Registry
 }
 
 func (p Params) StartServices() (_ Services, err error) {
 	var (
-		starters []func() error
-		closers  []io.Closer
+		registry = prometheus.NewRegistry()
+
+		inst = pkginstrument.Instrumentation{
+			Logger:     p.Logger,
+			Registerer: registry,
+		}
+
+		starters pkgio.Starters
+		closers  pkgio.Closers
 
 		clock = pkgclock.RealClock{}
 	)
 	defer func() {
 		if err != nil {
-			err = multierr.Append(err, Services{closers: closers}.Close())
+			err = multierr.Append(err, closers.Close(context.Background()))
 		}
 	}()
 
@@ -37,21 +54,11 @@ func (p Params) StartServices() (_ Services, err error) {
 	if err != nil {
 		return Services{}, fmt.Errorf("building redis client: %w", err)
 	}
-	closers = append(closers, memStore)
+	closers = append(closers, pkgio.CloseWithoutContext(memStore.Close))
 
-	var httpAuthMiddleware httpmiddleware.Middleware
-	switch p.Configuration.Auth.Type {
-	case pkgauth.ValidatorConfigurationNoop:
-		httpAuthMiddleware = pkgauth.NoopMiddleware()
-	case pkgauth.ValidatorConfigurationJWTRSA:
-		validator, e := p.Configuration.Auth.JWTValidator.Build()
-		if e != nil {
-			return Services{}, fmt.Errorf("building JWT RSA validator: %w", e)
-		}
-
-		httpAuthMiddleware = pkgauth.HTTPTokenAuthorizationMiddleware(p.Logger, validator)
-	default:
-		return Services{}, fmt.Errorf("auth not configured")
+	httpAuthMiddleware, err := p.Configuration.Auth.BuildHTTPMiddleware(inst)
+	if err != nil {
+		return Services{}, fmt.Errorf("building HTTP auth middleware: %w", err)
 	}
 
 	tokenIssuer, err := p.Registerer.TokenIssuer.Build()
@@ -63,7 +70,7 @@ func (p Params) StartServices() (_ Services, err error) {
 	if err != nil {
 		return Services{}, fmt.Errorf("building auth db connection: %w", err)
 	}
-	starters = append(starters, usersDB.Start)
+	starters = append(starters, usersDB)
 	closers = append(closers, usersDB)
 
 	activeUsersTracker, err := services.NewActiveUsersTracker(memStore, clock)
@@ -71,30 +78,33 @@ func (p Params) StartServices() (_ Services, err error) {
 		return Services{}, fmt.Errorf("building active users tracker: %w", err)
 	}
 
-	var sErr error
-	for _, s := range starters {
-		if e := s(); e != nil {
-			sErr = multierr.Append(sErr, e)
-		}
+	etcdClient, err := p.Etcd.Build()
+	if err != nil {
+		return Services{}, fmt.Errorf("building etcd client: %w", err)
 	}
-	if sErr != nil {
-		return Services{}, fmt.Errorf("starting services: %w", sErr)
+
+	eventServersRegistry := esmembership.NewServerRegistry(inst, etcdClient)
+	starters = append(starters, eventServersRegistry)
+	closers = append(closers, eventServersRegistry)
+
+	esPool := esclient.NewPool(inst, eventServersRegistry)
+	closers = append(closers, esPool)
+
+	rtServerResolver := rtconn.NewServerResolver(inst, memStore)
+	rtRelay := services.NewRealTimeEventRelay(inst, rtServerResolver, esPool)
+
+	if err = starters.Start(context.Background()); err != nil {
+		return Services{}, fmt.Errorf("starting services: %w", err)
 	}
 
 	return Services{
-		ActiveUserTracker:  activeUsersTracker,
-		HTTPAuthMiddleware: httpAuthMiddleware,
-		AuthRegisterer:     pkgauth.NewRegisterer(usersDB, tokenIssuer),
-		closers:            closers,
-	}, nil
-}
+		ActiveUserTracker:   activeUsersTracker,
+		HTTPAuthMiddleware:  httpAuthMiddleware,
+		AuthRegisterer:      pkgauth.NewRegisterer(usersDB, tokenIssuer),
+		RTEventsRelay:       rtRelay,
+		EventServerRegistry: eventServersRegistry,
+		MetricsRegistry:     registry,
 
-func (s Services) Close() error {
-	var mErr error
-	for _, c := range s.closers {
-		if err := c.Close(); err != nil {
-			mErr = multierr.Append(mErr, err)
-		}
-	}
-	return mErr
+		Closers: closers,
+	}, nil
 }

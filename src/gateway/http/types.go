@@ -2,6 +2,7 @@ package http
 
 import (
 	"github.com/faustuzas/occa/src/gateway/services"
+	pkgid "github.com/faustuzas/occa/src/pkg/id"
 )
 
 type RegistrationRequest struct {
@@ -25,4 +26,13 @@ type LoginResponse struct {
 
 type ActiveUsersResponse struct {
 	ActiveUsers []services.ActiveUser `json:"activeUsers"`
+}
+
+type SelectServerResponse struct {
+	Address string `json:"address"`
+}
+
+type SendMessageRequest struct {
+	RecipientID pkgid.ID `json:"recipientId"`
+	Message     string   `json:"message"`
 }

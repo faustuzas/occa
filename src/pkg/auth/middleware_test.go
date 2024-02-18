@@ -18,7 +18,7 @@ func TestHTTPMiddleware_MissingHeader(t *testing.T) {
 		validatorMock = NewMockTokenValidator(ctrl)
 	)
 
-	authMiddleware := HTTPTokenAuthorizationMiddleware(pkgtest.Logger, validatorMock)
+	authMiddleware := HTTPTokenAuthorizationMiddleware(pkgtest.Instrumentation, validatorMock)
 
 	passed := false
 	srv := httptest.NewServer(authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func TestHTTPMiddleware_Success(t *testing.T) {
 	)
 
 	validatorMock.EXPECT().Validate(gomock.Any(), token).Return(principal, nil)
-	authMiddleware := HTTPTokenAuthorizationMiddleware(pkgtest.Logger, validatorMock)
+	authMiddleware := HTTPTokenAuthorizationMiddleware(pkgtest.Instrumentation, validatorMock)
 
 	var actualPrincipal Principal
 	srv := httptest.NewServer(authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -19,12 +19,12 @@ func (u *UsersDB) FindByUsername(ctx context.Context, username string) (User, er
 	return user, u.db.WithContext(ctx).Find(&user, "username = ?", username).Error
 }
 
-func (u *UsersDB) Start() error {
-	return u.db.AutoMigrate(User{})
+func (u *UsersDB) Start(ctx context.Context) error {
+	return u.db.WithContext(ctx).AutoMigrate(User{})
 }
 
-func (u *UsersDB) Close() error {
-	if db, _ := u.db.DB(); db != nil {
+func (u *UsersDB) Close(ctx context.Context) error {
+	if db, _ := u.db.WithContext(ctx).DB(); db != nil {
 		return db.Close()
 	}
 	return nil

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package rteventspb;
+
+option go_package = "github.com/faustuzas/occa/src/pkg/generated/proto/rteventspb";
+
+message DirectMessage {
+  string sender_id = 1;
+  string message = 2;
+}
+
+message Event {
+  oneof payload {
+    DirectMessage direct_message = 1;
+  }
+}

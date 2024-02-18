@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pkgdb "github.com/faustuzas/occa/src/pkg/db"
+	pkgio "github.com/faustuzas/occa/src/pkg/io"
 )
 
 //go:generate sh -c "mockgen -package=db -destination=db_mock.go . Users"
@@ -16,9 +17,10 @@ type User struct {
 }
 
 type Users interface {
+	pkgio.Closer
+
 	Create(ctx context.Context, u User) error
 	FindByUsername(ctx context.Context, username string) (User, error)
 
-	Start() error
-	Close() error
+	Start(ctx context.Context) error
 }

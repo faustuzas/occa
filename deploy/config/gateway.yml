@@ -23,3 +23,7 @@ registerer:
       database: auth
       username: root
       password: root
+
+etcd:
+  endpoints:
+    - http://localhost:2379

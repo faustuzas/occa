@@ -3,13 +3,14 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/faustuzas/occa/src/gateway/http"
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
+	pkgetcd "github.com/faustuzas/occa/src/pkg/etcd"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
@@ -23,6 +24,7 @@ type Configuration struct {
 	MemStore   pkgmemstore.Configuration       `yaml:"memstore"`
 	Auth       pkgauth.ValidatorConfiguration  `yaml:"auth"`
 	Registerer pkgauth.RegistererConfiguration `yaml:"registerer"`
+	Etcd       pkgetcd.Configuration           `yaml:"etcd"`
 }
 
 type Params struct {
@@ -36,27 +38,23 @@ type Params struct {
 // Start starts gateway server and blocks until close request is received.
 // Returns error in case initialisation failed.
 func Start(p Params) error {
-	var (
-		logger   = p.Logger
-		registry = prometheus.NewRegistry()
-	)
-
 	services, err := p.StartServices()
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if e := services.Close(); e != nil {
-			logger.Error("error while closing services", zap.Error(e))
+		if err = services.CloseWithTimeout(15 * time.Second); err != nil {
+			p.Logger.Error("error while closing services", zap.Error(err))
 		}
 	}()
 
 	routes, err := http.Configure(http.Services{
-		UsersRegisterer:    services.AuthRegisterer,
-		AuthMiddleware:     services.HTTPAuthMiddleware,
-		ActiveUsersTracker: services.ActiveUserTracker,
-		Logger:             p.Logger,
-		Registry:           registry,
+		UsersRegisterer:     services.AuthRegisterer,
+		AuthMiddleware:      services.HTTPAuthMiddleware,
+		ActiveUsersTracker:  services.ActiveUserTracker,
+		EventServerSelector: services.EventServerRegistry,
+		Logger:              p.Logger,
+		Registry:            services.MetricsRegistry,
 	})
 	if err != nil {
 		return fmt.Errorf("configuring routes: %v", err)
@@ -68,18 +66,18 @@ func Start(p Params) error {
 	}
 
 	var (
-		srv      = pkghttp.NewServer(logger, httpListener, routes)
+		srv      = pkghttp.NewServer(p.Logger, httpListener, routes)
 		srvErrCh = make(chan error, 1)
 	)
 	go func() {
-		logger.Info("starting server", zap.Stringer("address", p.HTTPListenAddress))
+		p.Logger.Info("starting server", zap.Stringer("address", p.HTTPListenAddress))
 
 		srvErrCh <- srv.Start()
 	}()
 
 	select {
 	case <-p.CloseCh:
-		logger.Info("received close request, terminating")
+		p.Logger.Info("received close request, terminating")
 		if err = srv.Shutdown(context.Background()); err != nil {
 			return fmt.Errorf("shuting down server: %w", err)
 		}

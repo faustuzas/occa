@@ -2,28 +2,44 @@ package eventserver
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
-	"github.com/faustuzas/occa/src/eventserver/generated/proto/eventserverpb"
-
+	esgrpc "github.com/faustuzas/occa/src/eventserver/grpc"
+	"github.com/faustuzas/occa/src/eventserver/http"
+	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	pkgconfig "github.com/faustuzas/occa/src/pkg/config"
+	pkgetcd "github.com/faustuzas/occa/src/pkg/etcd"
+	esmembership "github.com/faustuzas/occa/src/pkg/eventserver/membership"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
-	httpmiddleware "github.com/faustuzas/occa/src/pkg/http/middleware"
+	pkginstrument "github.com/faustuzas/occa/src/pkg/instrument"
+	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
 )
 
 type Configuration struct {
 	pkgconfig.CommonConfiguration `yaml:",inline"`
 
+	Auth pkgauth.ValidatorConfiguration `yaml:"auth"`
+
 	HTTPListenAddress *pkgnet.ListenAddr `yaml:"httpListenAddress"`
 	GRPCListenAddress *pkgnet.ListenAddr `yaml:"grpcListenAddress"`
+
+	Etcd     pkgetcd.Configuration     `yaml:"etcd"`
+	MemStore pkgmemstore.Configuration `yaml:"memstore"`
+
+	ServerID string `yaml:"serverID"`
+}
+
+func (c Configuration) Validate() error {
+	if c.ServerID == "" {
+		return fmt.Errorf("server ID cannot be empty")
+	}
+	return nil
 }
 
 type Params struct {
@@ -37,92 +53,131 @@ type Params struct {
 // Start starts chat server and blocks until close request is received.
 // Returns error in case initialisation failed.
 func Start(p Params) error {
-	var (
-		logger   = p.Logger
-		registry = prometheus.NewRegistry()
-	)
+	if err := p.Configuration.Validate(); err != nil {
+		return fmt.Errorf("validating configuration: %w", err)
+	}
+
+	services, err := p.StartServices()
+	if err != nil {
+		return err
+	}
+
+	serverStarted := false
+	defer func() {
+		if !serverStarted {
+			if e := services.CloseWithTimeout(15 * time.Second); e != nil {
+				p.Logger.Error("error while closing services", zap.Error(e))
+			}
+		}
+	}()
 
 	httpListener, err := p.HTTPListenAddress.Listener()
 	if err != nil {
 		return fmt.Errorf("binding to http address: %w", err)
 	}
 
+	httpHandler, err := http.Configure(http.Services{
+		EventServer:        services.EventServer,
+		HTTPAuthMiddleware: services.HTTPAuthMiddleware,
+		Logger:             p.Logger,
+		Registry:           services.MetricsRegistry,
+	})
+	if err != nil {
+		return fmt.Errorf("configuring http handler: %w", err)
+	}
+	httpServer := pkghttp.NewServer(p.Logger, httpListener, httpHandler)
+
 	grpcListener, err := p.GRPCListenAddress.Listener()
 	if err != nil {
 		return fmt.Errorf("binding to gRPC address: %w", err)
 	}
 
-	cs, err := NewEventServer(logger, registry)
-	if err != nil {
-		return fmt.Errorf("constructing chat server: %w", err)
+	grpcServer := grpc.NewServer()
+	if err = esgrpc.Configure(grpcServer, esgrpc.Services{
+		EventServer: services.EventServer,
+		Instrumentation: pkginstrument.Instrumentation{
+			Logger:     p.Logger,
+			Registerer: services.MetricsRegistry,
+		},
+	}); err != nil {
+		return fmt.Errorf("configuring GRPC server: %w", err)
 	}
 
-	r, err := routes(logger, registry, cs)
-	if err != nil {
-		return fmt.Errorf("configuring routes: %v", err)
-	}
-
-	var (
-		httpSrv    = pkghttp.NewServer(logger, httpListener, r)
-		grpcServer = grpc.NewServer()
-
-		errCh = make(chan error, 2)
-	)
-
+	// Create a close channel where various actors might trigger termination.
+	// Make it relatively big so no one would get blocked.
+	closeCh := make(chan error, 10)
 	go func() {
-		logger.Info("starting http server", zap.Stringer("address", p.HTTPListenAddress))
-
-		errCh <- httpSrv.Start()
+		p.Logger.Info("starting HTTP server", zap.Stringer("address", p.HTTPListenAddress))
+		closeCh <- httpServer.Start()
 	}()
 
 	go func() {
-		eventserverpb.RegisterEventServerServer(grpcServer, NewGRPCServer(logger, cs))
-
-		logger.Info("starting gRPC server", zap.Stringer("address", p.GRPCListenAddress))
-
-		errCh <- grpcServer.Serve(grpcListener)
+		p.Logger.Info("starting gRPC server", zap.Stringer("address", p.GRPCListenAddress))
+		closeCh <- grpcServer.Serve(grpcListener)
 	}()
 
-	select {
-	case <-p.CloseCh:
-		logger.Info("received close request, terminating")
-		if err = httpSrv.Shutdown(context.Background()); err != nil {
-			return fmt.Errorf("shuting down server: %w", err)
+	lostLeaseC, err := services.MembershipManager.JoinCluster(context.Background(),
+		func(ctx context.Context) (esmembership.ServerInfo, error) {
+			return esmembership.ServerInfo{
+				ID:          p.ServerID,
+				GRPCAddress: p.Configuration.GRPCListenAddress.String(),
+				HTTPAddress: p.Configuration.HTTPListenAddress.String(),
+			}, nil
+		})
+	if err != nil {
+		return fmt.Errorf("joining cluster: %w", err)
+	}
+	go func() {
+		select {
+		case <-lostLeaseC:
+			closeCh <- fmt.Errorf("lost membership in the cluster")
+		case <-closeCh:
 		}
+	}()
 
-		// TODO: implement graceful shutdown for gRPC server
-	case err = <-errCh:
-		return fmt.Errorf("starting server: %w", err)
+	go func() {
+		select {
+		case <-p.CloseCh:
+			p.Logger.Info("received close request, terminating")
+			closeCh <- nil
+		case <-closeCh:
+		}
+	}()
+
+	serverStarted = true
+
+	// wait until first termination trigger
+	closeErr := <-closeCh
+
+	closeCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err = services.EventServer.InitiateShutdown(closeCtx); err != nil {
+		p.Logger.Error("failed initiation event server shutdown", zap.Error(err))
 	}
 
-	return nil
-}
+	if err = services.MembershipManager.LeaveCluster(closeCtx); err != nil {
+		p.Logger.Error("failed leaving cluster", zap.Error(err))
+	}
 
-func routes(l *zap.Logger, r *prometheus.Registry, server EventServer) (http.Handler, error) {
-	rawRouter := pkghttp.NewRouterBuilder(l)
-	rawRouter.HandleFunc("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}).ServeHTTP).
-		Methods(http.MethodGet)
+	g, _ := errgroup.WithContext(closeCtx)
+	g.Go(func() error {
+		grpcServer.GracefulStop()
+		return nil
+	})
 
-	instrumentedRouter := rawRouter.SubGroup().
-		With(httpmiddleware.BasicMetrics(r), httpmiddleware.RequestLogger(l))
-
-	instrumentedRouter.HandleJSONFunc("/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		return pkghttp.DefaultOKResponse(), nil
-	}).Methods(http.MethodGet)
-
-	// TODO: protobuf alternative should be added too
-	instrumentedRouter.HandleJSONFunc("/send-message", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		var msg Event
-		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
-			return nil, err
+	g.Go(func() error {
+		if err = httpServer.Shutdown(closeCtx); err != nil {
+			p.Logger.Error("failed closing HTTP server", zap.Error(err))
 		}
+		return nil
+	})
 
-		if err := server.SendEvent(r.Context(), msg); err != nil {
-			return nil, fmt.Errorf("sending message: %w", err)
-		}
+	_ = g.Wait()
 
-		return pkghttp.DefaultOKResponse(), nil
-	}).Methods(http.MethodPost)
+	if err = services.Close(closeCtx); err != nil {
+		p.Logger.Error("error while closing services", zap.Error(err))
+	}
 
-	return rawRouter.Build(), nil
+	return closeErr
 }

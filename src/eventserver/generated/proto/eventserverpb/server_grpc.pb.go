@@ -8,6 +8,7 @@ package eventserverpb
 
 import (
 	context "context"
+	rteventspb "github.com/faustuzas/occa/src/pkg/generated/proto/rteventspb"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -19,7 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	EventServer_Connect_FullMethodName = "/chatserver.EventServer/Connect"
+	EventServer_Connect_FullMethodName = "/eventserverpb.EventServer/Connect"
 )
 
 // EventServerClient is the client API for EventServer service.
@@ -53,7 +54,7 @@ func (c *eventServerClient) Connect(ctx context.Context, in *ConnectRequest, opt
 }
 
 type EventServer_ConnectClient interface {
-	Recv() (*Event, error)
+	Recv() (*rteventspb.Event, error)
 	grpc.ClientStream
 }
 
@@ -61,8 +62,8 @@ type eventServerConnectClient struct {
 	grpc.ClientStream
 }
 
-func (x *eventServerConnectClient) Recv() (*Event, error) {
-	m := new(Event)
+func (x *eventServerConnectClient) Recv() (*rteventspb.Event, error) {
+	m := new(rteventspb.Event)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -106,7 +107,7 @@ func _EventServer_Connect_Handler(srv interface{}, stream grpc.ServerStream) err
 }
 
 type EventServer_ConnectServer interface {
-	Send(*Event) error
+	Send(*rteventspb.Event) error
 	grpc.ServerStream
 }
 
@@ -114,7 +115,7 @@ type eventServerConnectServer struct {
 	grpc.ServerStream
 }
 
-func (x *eventServerConnectServer) Send(m *Event) error {
+func (x *eventServerConnectServer) Send(m *rteventspb.Event) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -122,7 +123,7 @@ func (x *eventServerConnectServer) Send(m *Event) error {
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var EventServer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "chatserver.EventServer",
+	ServiceName: "eventserverpb.EventServer",
 	HandlerType: (*EventServerServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
