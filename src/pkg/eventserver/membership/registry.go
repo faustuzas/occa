@@ -143,7 +143,7 @@ func (r *ServerRegistry) watchForUpdates(ch clientv3.WatchChan) {
 					r.mu.Unlock()
 
 					if ok {
-						r.i.Logger.Info("event server info updated", zap.String("serverId", info.ID))
+						r.i.Logger.Debug("event server info updated", zap.String("serverId", info.ID))
 					} else {
 						r.i.Logger.Info("new event server added", zap.String("serverId", info.ID))
 					}
