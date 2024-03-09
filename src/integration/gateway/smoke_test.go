@@ -7,14 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/faustuzas/occa/src/gateway"
-	"github.com/faustuzas/occa/src/integration/containers"
-	"github.com/faustuzas/occa/src/integration/serviceboot"
 	pkghttp "github.com/faustuzas/occa/src/pkg/http"
 	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
 func TestGateway_Smoke(t *testing.T) {
-	params := serviceboot.DefaultGatewayParams(t, containers.WithMysql(t), containers.WithRedis(t))
+	params := DefaultParams(t)
 	go func() {
 		require.NoError(t, gateway.Start(params))
 	}()

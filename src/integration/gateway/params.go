@@ -1,9 +1,10 @@
-package serviceboot
+package gateway
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -11,12 +12,19 @@ import (
 	"github.com/faustuzas/occa/src/integration/containers"
 	pkgauth "github.com/faustuzas/occa/src/pkg/auth"
 	pkgdb "github.com/faustuzas/occa/src/pkg/db"
+	pkgetcd "github.com/faustuzas/occa/src/pkg/etcd"
 	pkgmemstore "github.com/faustuzas/occa/src/pkg/memstore"
 	pkgnet "github.com/faustuzas/occa/src/pkg/net"
 	pkgtest "github.com/faustuzas/occa/src/pkg/test"
 )
 
-func DefaultGatewayParams(t *testing.T, db *containers.MySQLContainer, redis *containers.RedisContainer) gateway.Params {
+func DefaultParams(t *testing.T) gateway.Params {
+	var (
+		db    = containers.WithMysql(t)
+		redis = containers.WithRedis(t)
+		etcd  = containers.WithEtcd(t)
+	)
+
 	listenAddr := pkgnet.ListenAddrFromAddress("0.0.0.0:0")
 	listener, err := listenAddr.Listener()
 	require.NoError(t, err)
@@ -44,6 +52,13 @@ func DefaultGatewayParams(t *testing.T, db *containers.MySQLContainer, redis *co
 				User:     redis.Username,
 				Password: redis.Password,
 				Address:  fmt.Sprintf("localhost:%d", redis.Port),
+				Prefix:   uuid.New().String(),
+			},
+
+			Etcd: pkgetcd.Configuration{
+				Username:  etcd.Username,
+				Password:  etcd.Password,
+				Endpoints: etcd.Endpoints(),
 			},
 
 			Auth: pkgauth.ValidatorConfiguration{
@@ -65,7 +80,7 @@ func DefaultGatewayParams(t *testing.T, db *containers.MySQLContainer, redis *co
 				},
 			},
 		},
-		Logger:  pkgtest.Logger.With(zap.String("component", "gateway")),
+		Logger:  pkgtest.Instrumentation.Logger.With(zap.String("component", "gateway")),
 		CloseCh: closeCh,
 	}
 }

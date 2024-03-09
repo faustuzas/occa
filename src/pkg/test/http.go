@@ -1,7 +1,9 @@
 package test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -42,4 +44,16 @@ func HTTPExec(t testing.TB, req *http.Request) (*http.Response, []byte) {
 	require.NoError(t, err)
 
 	return resp, body
+}
+
+func ToJSONBody(t testing.TB, val any) io.Reader {
+	b, err := json.Marshal(val)
+	require.NoError(t, err)
+	return bytes.NewBuffer(b)
+}
+
+func FromJSONBytes[T any](t testing.TB, bytes []byte) T {
+	var val T
+	require.NoError(t, json.Unmarshal(bytes, &val))
+	return val
 }

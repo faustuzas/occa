@@ -8,9 +8,16 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 )
 
+var mu sync.Mutex
+
 func GetRSAPairPaths() (public string, private string, err error) {
+	// protect concurrent tests from clashing with each other
+	mu.Lock()
+	defer mu.Unlock()
+
 	var (
 		dirPath = path.Join(os.TempDir(), "occa_keys")
 

@@ -18,6 +18,10 @@ type EtcdContainer struct {
 	Port     int
 }
 
+func (c *EtcdContainer) Endpoints() []string {
+	return []string{fmt.Sprintf("http://localhost:%d", c.Port)}
+}
+
 func WithEtcd(t *testing.T) *EtcdContainer {
 	c, err := resolve[*EtcdContainer]("etcd", t, func() (registeredContainer, error) {
 		const port = "2379"

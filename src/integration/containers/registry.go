@@ -13,6 +13,10 @@ const (
 	cleanUpContainerEnvKey = "CLEANUP_TEST_CONTAINERS"
 )
 
+func init() {
+	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+}
+
 type registeredContainer interface {
 	IncRef()
 	Terminate(ctx context.Context) error
