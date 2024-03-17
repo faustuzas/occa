@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -23,11 +24,15 @@ type Services struct {
 	Instrumentation pkginstrument.Instrumentation
 }
 
-// TODO: add metrics and logs
-
 func Configure(services Services) (*grpc.Server, error) {
+	metrics := grpcprom.NewServerMetrics()
+	services.Instrumentation.Registerer.MustRegister(metrics)
+
 	grpcServer := grpc.NewServer(
-		grpc.ChainStreamInterceptor(services.StreamAuthInterceptor),
+		grpc.ChainStreamInterceptor(
+			metrics.StreamServerInterceptor(),
+			services.StreamAuthInterceptor,
+		),
 	)
 
 	server := NewServer(services.Instrumentation, services.EventServer)

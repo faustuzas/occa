@@ -26,12 +26,8 @@ func DefaultParams(t *testing.T) gateway.Params {
 	)
 
 	listenAddr := pkgnet.ListenAddrFromAddress("0.0.0.0:0")
-	listener, err := listenAddr.Listener()
+	_, err := listenAddr.Listener()
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = listener.Close()
-	})
 
 	closeCh := make(chan struct{})
 	t.Cleanup(func() {
@@ -80,7 +76,7 @@ func DefaultParams(t *testing.T) gateway.Params {
 				},
 			},
 		},
-		Logger:  pkgtest.Instrumentation.Logger.With(zap.String("component", "gateway")),
+		Logger:  pkgtest.Instrumentation.Logger.With(zap.String("component", "gateway"), zap.String("test", t.Name())),
 		CloseCh: closeCh,
 	}
 }

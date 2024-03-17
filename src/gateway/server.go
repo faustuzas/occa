@@ -65,6 +65,10 @@ func Start(p Params) error {
 		return fmt.Errorf("binding to address: %w", err)
 	}
 
+	defer func() {
+		_ = httpListener.Close()
+	}()
+
 	var (
 		srv      = pkghttp.NewServer(p.Logger, httpListener, routes)
 		srvErrCh = make(chan error, 1)

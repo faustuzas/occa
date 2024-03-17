@@ -24,20 +24,12 @@ func DefaultParams(t *testing.T) eventserver.Params {
 	)
 
 	httpListenAddr := pkgnet.ListenAddrFromAddress("0.0.0.0:0")
-	httpListener, err := httpListenAddr.Listener()
+	_, err := httpListenAddr.Listener()
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = httpListener.Close()
-	})
 
 	grpcListenAddr := pkgnet.ListenAddrFromAddress("0.0.0.0:0")
-	grpcListener, err := grpcListenAddr.Listener()
+	_, err = grpcListenAddr.Listener()
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = grpcListener.Close()
-	})
 
 	closeCh := make(chan struct{})
 	t.Cleanup(func() {
@@ -70,7 +62,7 @@ func DefaultParams(t *testing.T) eventserver.Params {
 				},
 			},
 		},
-		Logger:  pkgtest.Instrumentation.Logger.With(zap.String("component", "chat-server")),
+		Logger:  pkgtest.Instrumentation.Logger.With(zap.String("component", "chat-server"), zap.String("test", t.Name())),
 		CloseCh: closeCh,
 	}
 }

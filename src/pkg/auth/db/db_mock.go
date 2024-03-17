@@ -35,17 +35,17 @@ func (m *MockUsers) EXPECT() *MockUsersMockRecorder {
 }
 
 // Close mocks base method.
-func (m *MockUsers) Close() error {
+func (m *MockUsers) Close(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
+	ret := m.ctrl.Call(m, "Close", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Close indicates an expected call of Close.
-func (mr *MockUsersMockRecorder) Close() *gomock.Call {
+func (mr *MockUsersMockRecorder) Close(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockUsers)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockUsers)(nil).Close), arg0)
 }
 
 // Create mocks base method.
@@ -78,15 +78,15 @@ func (mr *MockUsersMockRecorder) FindByUsername(arg0, arg1 interface{}) *gomock.
 }
 
 // Start mocks base method.
-func (m *MockUsers) Start() error {
+func (m *MockUsers) Start(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Start")
+	ret := m.ctrl.Call(m, "Start", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockUsersMockRecorder) Start() *gomock.Call {
+func (mr *MockUsersMockRecorder) Start(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockUsers)(nil).Start))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockUsers)(nil).Start), arg0)
 }

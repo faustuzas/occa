@@ -31,6 +31,10 @@ func NewGRPCTester(t *testing.T, ctx context.Context, address string, userID pkg
 	conn, err := grpc.DialContext(ctx, address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		_ = conn.Close()
+	})
+
 	return &GRPCTester{
 		t:      t,
 		ctx:    ctx,
@@ -97,8 +101,6 @@ func (r GRPCStream[T]) RecvCh() <-chan Msg[T] {
 func generateToken(t *testing.T, userID pkgid.ID, name string) string {
 	_, privatePath, err := pkgtest.GetRSAPairPaths()
 	require.NoError(t, err)
-
-	fmt.Printf("priv key path: %v\n", privatePath)
 
 	privateKey, err := pkgauth.ReadPrivateKey(privatePath)
 	require.NoError(t, err)

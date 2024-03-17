@@ -75,6 +75,9 @@ func Start(p Params) error {
 	if err != nil {
 		return fmt.Errorf("binding to http address: %w", err)
 	}
+	defer func() {
+		_ = httpListener.Close()
+	}()
 
 	httpHandler, err := http.Configure(http.Services{
 		EventServer:        services.EventServer,
@@ -91,6 +94,9 @@ func Start(p Params) error {
 	if err != nil {
 		return fmt.Errorf("binding to gRPC address: %w", err)
 	}
+	defer func() {
+		_ = grpcListener.Close()
+	}()
 
 	var grpcServer *grpc.Server
 	if grpcServer, err = esgrpc.Configure(esgrpc.Services{
@@ -109,12 +115,12 @@ func Start(p Params) error {
 	closeCh := make(chan error, 10)
 	go func() {
 		p.Logger.Info("starting HTTP server", zap.Stringer("address", p.HTTPListenAddress))
-		closeCh <- httpServer.Start()
+		closeCh <- wrapErr(httpServer.Start(), "HTTP server")
 	}()
 
 	go func() {
 		p.Logger.Info("starting gRPC server", zap.Stringer("address", p.GRPCListenAddress))
-		closeCh <- grpcServer.Serve(grpcListener)
+		closeCh <- wrapErr(grpcServer.Serve(grpcListener), "gRPC server")
 	}()
 
 	lostLeaseC, err := services.MembershipManager.JoinCluster(context.Background(),
@@ -181,4 +187,12 @@ func Start(p Params) error {
 	}
 
 	return closeErr
+}
+
+func wrapErr(err error, context string) error {
+	if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("%s: %w", context, err)
 }
