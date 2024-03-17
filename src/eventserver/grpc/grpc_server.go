@@ -17,16 +17,23 @@ import (
 var _ eventserverpb.EventServerServer = (*Server)(nil)
 
 type Services struct {
-	EventServer     services.EventServer
+	EventServer           services.EventServer
+	StreamAuthInterceptor grpc.StreamServerInterceptor
+
 	Instrumentation pkginstrument.Instrumentation
 }
 
-// TODO: add auth
+// TODO: add metrics and logs
 
-func Configure(r grpc.ServiceRegistrar, services Services) error {
+func Configure(services Services) (*grpc.Server, error) {
+	grpcServer := grpc.NewServer(
+		grpc.ChainStreamInterceptor(services.StreamAuthInterceptor),
+	)
+
 	server := NewServer(services.Instrumentation, services.EventServer)
-	eventserverpb.RegisterEventServerServer(r, server)
-	return nil
+	eventserverpb.RegisterEventServerServer(grpcServer, server)
+
+	return grpcServer, nil
 }
 
 func NewServer(i pkginstrument.Instrumentation, eventServer services.EventServer) *Server {

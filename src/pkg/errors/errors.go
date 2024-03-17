@@ -5,18 +5,18 @@ import "fmt"
 type ErrorType int
 
 const (
-	Unauthorized ErrorType = iota + 1
-	BadRequest
-	InternalServer
+	TypeUnauthorized ErrorType = iota + 1
+	TypeBadRequest
+	TypeInternalServer
 )
 
 func (t ErrorType) String() string {
 	switch t {
-	case Unauthorized:
+	case TypeUnauthorized:
 		return "unauthorized"
-	case BadRequest:
+	case TypeBadRequest:
 		return "bad_request"
-	case InternalServer:
+	case TypeInternalServer:
 		return "internal"
 	}
 	panic(fmt.Sprintf("unrecognized error: %d", t))
@@ -41,7 +41,14 @@ func (e GenericErr) Unwrap() error {
 
 func ErrUnauthorized(cause error) GenericErr {
 	return GenericErr{
-		type_: Unauthorized,
+		type_: TypeUnauthorized,
+		cause: cause,
+	}
+}
+
+func BadRequest(cause error) GenericErr {
+	return GenericErr{
+		type_: TypeBadRequest,
 		cause: cause,
 	}
 }

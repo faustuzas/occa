@@ -26,11 +26,11 @@ func DetermineHTTPError(err error) Err {
 	var gErr pkgerrors.GenericErr
 	if errors.As(err, &gErr) {
 		switch gErr.Type() {
-		case pkgerrors.BadRequest:
+		case pkgerrors.TypeBadRequest:
 			statusCode = http.StatusBadRequest
-		case pkgerrors.Unauthorized:
+		case pkgerrors.TypeUnauthorized:
 			statusCode = http.StatusUnauthorized
-		case pkgerrors.InternalServer:
+		case pkgerrors.TypeInternalServer:
 			statusCode = http.StatusInternalServerError
 		}
 		cause = gErr.Unwrap()

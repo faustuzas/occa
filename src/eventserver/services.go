@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc"
 
 	"github.com/faustuzas/occa/src/eventserver/services"
 	"github.com/faustuzas/occa/src/pkg/eventserver/membership"
@@ -16,9 +17,11 @@ import (
 type Services struct {
 	pkgio.Closers
 
-	HTTPAuthMiddleware httpmiddleware.Middleware
-	EventServer        services.EventServer
-	MembershipManager  membership.Manager
+	HTTPAuthMiddleware        httpmiddleware.Middleware
+	GRPCStreamAuthInterceptor grpc.StreamServerInterceptor
+
+	EventServer       services.EventServer
+	MembershipManager membership.Manager
 
 	MetricsRegistry *prometheus.Registry
 }
@@ -60,16 +63,22 @@ func (p Params) StartServices() (Services, error) {
 		return Services{}, fmt.Errorf("building HTTP auth middleware: %w", err)
 	}
 
+	grpcAuthMiddleware, err := p.Configuration.Auth.BuildGRPCStreamInterceptor(inst)
+	if err != nil {
+		return Services{}, fmt.Errorf("building gRPC auth middleware: %w", err)
+	}
+
 	membershipManager, err := membership.NewManager(inst, etcdClient)
 	if err != nil {
 		return Services{}, fmt.Errorf("creating membership manager: %w", err)
 	}
 
 	return Services{
-		HTTPAuthMiddleware: httpAuthMiddleware,
-		EventServer:        eventServer,
-		MembershipManager:  membershipManager,
-		MetricsRegistry:    registry,
-		Closers:            closers,
+		HTTPAuthMiddleware:        httpAuthMiddleware,
+		GRPCStreamAuthInterceptor: grpcAuthMiddleware,
+		EventServer:               eventServer,
+		MembershipManager:         membershipManager,
+		MetricsRegistry:           registry,
+		Closers:                   closers,
 	}, nil
 }

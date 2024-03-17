@@ -35,6 +35,10 @@ func GetRSAPairPaths() (public string, private string, err error) {
 		}
 	}()
 
+	if isValidFile(publicPath) && isValidFile(privatePath) {
+		return publicPath, privatePath, nil
+	}
+
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return "", "", fmt.Errorf("generating key: %w", err)
@@ -66,4 +70,13 @@ func GetRSAPairPaths() (public string, private string, err error) {
 	}
 
 	return publicPath, privatePath, nil
+}
+
+func isValidFile(path string) bool {
+	s, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	return s.Size() > 0
 }

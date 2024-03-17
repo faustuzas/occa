@@ -92,9 +92,10 @@ func Start(p Params) error {
 		return fmt.Errorf("binding to gRPC address: %w", err)
 	}
 
-	grpcServer := grpc.NewServer()
-	if err = esgrpc.Configure(grpcServer, esgrpc.Services{
-		EventServer: services.EventServer,
+	var grpcServer *grpc.Server
+	if grpcServer, err = esgrpc.Configure(esgrpc.Services{
+		EventServer:           services.EventServer,
+		StreamAuthInterceptor: services.GRPCStreamAuthInterceptor,
 		Instrumentation: pkginstrument.Instrumentation{
 			Logger:     p.Logger,
 			Registerer: services.MetricsRegistry,

@@ -12,10 +12,6 @@ import (
 	pkginstrument "github.com/faustuzas/occa/src/pkg/instrument"
 )
 
-type principalKey int
-
-var key principalKey
-
 func HTTPTokenAuthorizationMiddleware(i pkginstrument.Instrumentation, validator TokenValidator) httpmiddleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,17 +31,13 @@ func HTTPTokenAuthorizationMiddleware(i pkginstrument.Instrumentation, validator
 				return
 			}
 
-			r = r.WithContext(context.WithValue(r.Context(), key, principal))
+			r = r.WithContext(ContextWithPrincipal(r.Context(), principal))
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-func PrincipalFromContext(ctx context.Context) Principal {
-	return ctx.Value(key).(Principal)
-}
-
-func NoopMiddleware() httpmiddleware.Middleware {
+func HTTPNoopMiddleware() httpmiddleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r = r.WithContext(context.WithValue(r.Context(), key, noopPrincipal))

@@ -47,6 +47,7 @@ type heartBeater struct {
 func NewHeartBeater(i pkginstrument.Instrumentation, serverID string, store memstore.Store) HeartBeater {
 	return &heartBeater{
 		serverID: serverID,
+		hearts:   map[pkgid.ID]heart{},
 
 		memstore: store,
 		i:        i,
